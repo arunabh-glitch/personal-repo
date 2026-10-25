@@ -17,6 +17,22 @@ An Android e-book reader. Open books from anywhere on your phone or from free on
 - Table of contents, in-book search, progress slider, chapter/page indicator.
 - PDF: continuous scroll, pinch and double-tap zoom, outline, text search, night mode filter.
 - Reading position, covers and metadata are saved per book.
+- Also runs as an installable web app for iPhone/iPad/desktop (see below).
+
+## iPhone, iPad and desktop: the web app
+
+The same reader ships as an installable web app (`web/`). It keeps your books in the browser's
+private storage, works offline, and opens full screen from the home screen.
+
+**Install on iPhone:** open the hosted URL in Safari, tap **Share → Add to Home Screen**. Then open
+OpenShelf from the home screen, tap **+** and pick books from Files, iCloud Drive or Downloads.
+
+Limits compared with the Android app: no "Open with" from other apps (use **+** or the Share sheet's
+"Save to Files" first), and catalog downloads only work from sites that allow cross-origin requests.
+
+Build it yourself: `node web/build.mjs dist` produces a static folder you can host anywhere
+(GitHub Pages, Netlify, Vercel, any web server). The `Build web app` workflow does this on every push and
+publishes to GitHub Pages when Pages is enabled for the repository.
 
 ## Get the APK
 

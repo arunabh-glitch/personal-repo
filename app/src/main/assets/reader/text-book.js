@@ -97,8 +97,8 @@ const inline = s => {
     s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, '<em>[$1]</em>')
     s = s.replace(/\[([^\]]+)\]\(([^)\s]+)[^)]*\)/g, '<a href="$2">$1</a>')
     s = s.replace(/(\*\*|__)(.+?)\1/g, '<strong>$2</strong>')
-    s = s.replace(/(^|[^\w*])\*(?!\s)(.+?)(?<!\s)\*(?!\w)/g, '$1<em>$2</em>')
-    s = s.replace(/(^|[^\w_])_(?!\s)(.+?)(?<!\s)_(?!\w)/g, '$1<em>$2</em>')
+    s = s.replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?!\w)/g, '$1<em>$2</em>') // no lookbehind: older iOS Safari
+    s = s.replace(/(^|[^\w_])_(?=\S)([^_\n]*?\S)_(?!\w)/g, '$1<em>$2</em>')
     s = s.replace(/~~(.+?)~~/g, '<del>$1</del>')
     return s
 }

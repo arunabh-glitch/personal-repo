@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#5B4636">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="OpenShelf">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src *; frame-src blob: data:; worker-src 'self' blob:; form-action 'none';">
+<title>OpenShelf</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <h1>Library</h1>
+  <div class="actions">
+    <select id="sort" aria-label="Sort">
+      <option value="recent">Recent</option>
+      <option value="title">Title</option>
+      <option value="author">Author</option>
+      <option value="added">Date added</option>
+    </select>
+    <button id="btn-url" class="icon" aria-label="Add from URL" title="Add from URL">
+      <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <div id="install-hint" class="hint" hidden>
+    <strong>Install on your iPhone:</strong> tap the Share button in Safari, then <strong>Add to Home Screen</strong>. OpenShelf then opens full screen and works offline.
+    <button id="hint-close" class="link">Dismiss</button>
+  </div>
+  <div id="grid" class="grid"></div>
+  <div id="empty" class="empty" hidden>
+    <div class="empty-art">📚</div>
+    <p>Your shelf is empty.</p>
+    <p class="muted">Tap <strong>+</strong> to add EPUB, PDF, MOBI, AZW3, FB2, CBZ, TXT or Markdown files from Files, iCloud Drive or Downloads.</p>
+  </div>
+  <p id="storage" class="storage muted"></p>
+</main>
+
+<button id="fab" class="fab" aria-label="Add books">+</button>
+<input id="file-input" type="file" multiple hidden>
+
+<div id="sheet-scrim" class="scrim" hidden></div>
+<div id="sheet" class="sheet" hidden>
+  <div class="sheet-title" id="sheet-title"></div>
+  <div class="sheet-sub" id="sheet-sub"></div>
+  <button class="sheet-btn" data-act="open">Open</button>
+  <button class="sheet-btn" data-act="details">Details</button>
+  <button class="sheet-btn danger" data-act="delete">Remove from library</button>
+  <button class="sheet-btn" data-act="cancel">Cancel</button>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

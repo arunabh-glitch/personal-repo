@@ -1,5 +1,6 @@
 import './foliate/view.js'
 import { makeTextBook, isTextFormat } from './text-book.js'
+import { createWebBridge } from './web-bridge.js'
 
 const $ = s => document.querySelector(s)
 const $$ = s => Array.from(document.querySelectorAll(s))
@@ -16,8 +17,10 @@ const THEMES = {
 }
 
 // ---------- bridge to the Android host (falls back to browser storage) ----------
-const native = globalThis.Android
+let native = globalThis.Android
 const params = new URLSearchParams(location.search)
+// Web build: a library id in the URL selects the IndexedDB-backed bridge.
+const initWebBridge = async () => { if (!native && params.get('id') && !params.get('url')) native = await createWebBridge(params.get('id')) }
 const bridge = {
     getBookInfo() {
         if (native) return JSON.parse(native.getBookInfo())
@@ -72,14 +75,17 @@ const blobToDataURL = async (blob, maxH = 600) => {
 }
 
 class Reader {
-    settings = bridge.getSettings()
-    info = bridge.getBookInfo()
+    settings = null
+    info = null
     kind = 'reflow' // reflow | fixed | pdf
     barsVisible = false
     tocHrefs = new Map()
     searchAbort = null
 
     async open() {
+        await initWebBridge()
+        this.settings = bridge.getSettings()
+        this.info = bridge.getBookInfo()
         document.body.dataset.theme = this.settings.theme
         $('#title').textContent = this.info.title || ''
         this.#bindChrome()

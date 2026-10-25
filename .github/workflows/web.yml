@@ -1,0 +1,53 @@
+name: Build web app
+
+on:
+  push:
+    branches: ["**"]
+    paths: ["web/**", "app/src/main/assets/reader/**", ".github/workflows/web.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build web app
+        run: node web/build.mjs dist
+      - name: Upload web app (download and host anywhere)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenShelf-web
+          path: dist
+      - name: Upload for GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  # Publishes to GitHub Pages when Pages is available for this repository
+  # (public repo, or a plan that allows Pages on private repos).
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/ebook-reader-app'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - id: deployment
+        uses: actions/deploy-pages@v4
