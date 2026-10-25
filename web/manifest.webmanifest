@@ -1,7 +1,7 @@
 {
   "name": "OpenShelf",
   "short_name": "OpenShelf",
-  "description": "Read EPUB, PDF, MOBI, FB2, CBZ and text books.",
+  "description": "Read EPUB, PDF, MOBI, AZW3, FB2, CBZ and text books, offline.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
