@@ -11,10 +11,10 @@ const DEFAULTS = {
     flow: 'paginated', justify: true, hyphenate: true, pdfZoom: 1, keepScreenOn: false, defineOnSelect: true,
 }
 const THEMES = {
-    light: { bg: '#ffffff', fg: '#1b1b1b', link: '#1a5fb4', dark: false, force: false },
-    sepia: { bg: '#f4ecd8', fg: '#5b4636', link: '#8b4513', dark: false, force: true },
-    gray:  { bg: '#2b2b2b', fg: '#d6d6d6', link: '#8ab4f8', dark: true, force: true },
-    dark:  { bg: '#000000', fg: '#c8c8c8', link: '#8ab4f8', dark: true, force: true },
+    light: { bg: '#f7f2e8', fg: '#1b1813', link: '#1a5fb4', dark: false, force: false },
+    sepia: { bg: '#f1e6d0', fg: '#4a3a2a', link: '#8b4513', dark: false, force: true },
+    gray:  { bg: '#2a2724', fg: '#e2dbd0', link: '#8ab4f8', dark: true, force: true },
+    dark:  { bg: '#000000', fg: '#d9d2c7', link: '#8ab4f8', dark: true, force: true },
 }
 
 // ---------- bridge to the Android host (falls back to browser storage) ----------
