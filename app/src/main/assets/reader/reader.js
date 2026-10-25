@@ -2,6 +2,7 @@ import './foliate/view.js'
 import { makeTextBook, isTextFormat } from './text-book.js'
 import { createWebBridge } from './web-bridge.js'
 import { lookup, speak, selectedPhrase, normalizeWord } from './dictionary.js'
+import { Overlayer } from './foliate/overlayer.js'
 
 const $ = s => document.querySelector(s)
 const $$ = s => Array.from(document.querySelectorAll(s))
@@ -62,6 +63,23 @@ const formatTitle = t => !t ? '' : typeof t === 'string' ? t : Object.values(t)[
 const percent = new Intl.NumberFormat('en', { style: 'percent' })
 const escapeHTML = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const phase = p => { globalThis.__phase = p; console.log('phase: ' + p) }
+// Finds the word under a point without selecting anything (so iOS shows no Copy/Look Up bar).
+const wordRangeAt = (doc, x, y) => {
+    let node, offset
+    if (doc.caretRangeFromPoint) { const r = doc.caretRangeFromPoint(x, y); if (!r) return null; node = r.startContainer; offset = r.startOffset }
+    else if (doc.caretPositionFromPoint) { const p = doc.caretPositionFromPoint(x, y); if (!p) return null; node = p.offsetNode; offset = p.offset }
+    else return null
+    if (!node || node.nodeType !== 3) return null
+    const text = node.data
+    const isW = c => /[\p{L}\p{N}'’\u2019-]/u.test(c)
+    let st = offset, en = offset
+    while (st > 0 && isW(text[st - 1])) st--
+    while (en < text.length && isW(text[en])) en++
+    if (en - st < 1 || !/\p{L}/u.test(text.slice(st, en))) return null
+    const range = doc.createRange(); range.setStart(node, st); range.setEnd(node, en)
+    return range
+}
+const COARSE = matchMedia('(pointer: coarse)').matches
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms) } }
 
 const blobToDataURL = async (blob, maxH = 600) => {
@@ -102,9 +120,9 @@ class Reader {
         if (!localStorage.getItem('hint-shown')) {
             localStorage.setItem('hint-shown', '1')
             const hint = $('#tap-hint')
-            hint.innerHTML = '<div>← back a page</div><div>tap for menu</div><div>next page →</div>'
+            hint.innerHTML = '<div>← back</div><div>tap for menu<br><small>hold a word for its meaning</small></div><div>next →</div>'
             hint.hidden = false
-            setTimeout(() => hint.hidden = true, 2200)
+            setTimeout(() => hint.hidden = true, 3200)
         }
     }
 
@@ -127,6 +145,11 @@ class Reader {
 
         view.addEventListener('load', e => this.#onSectionLoad(e.detail))
         view.addEventListener('relocate', e => this.#onRelocate(e.detail))
+        view.addEventListener('draw-annotation', e => {
+            const { draw, annotation } = e.detail
+            if (String(annotation.value).startsWith('foliate-search:')) draw(Overlayer.highlight, { color: 'rgba(255,210,63,0.55)' })
+            else draw(Overlayer.highlight, { color: 'rgba(198,242,78,0.75)' })
+        })
         view.addEventListener('external-link', e => { e.preventDefault(); bridge.openExternal(e.detail.href) })
         this.book.transformTarget?.addEventListener('data', ({ detail }) => {
             detail.data = Promise.resolve(detail.data).catch(e => { console.error(e); return '' })
@@ -173,6 +196,7 @@ class Reader {
             img, svg { ${t.dark ? 'filter: brightness(0.88);' : ''} }` : ''
         return `
             @namespace epub "http://www.idpf.org/2007/ops";
+            @media (pointer: coarse) { html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } }
             html { color-scheme: ${t.dark ? 'dark' : 'light'}; }
             html, body { background: ${t.bg} !important; color: ${t.fg} !important; }
             html { font-size: ${s.fontSize}px !important; }
@@ -192,7 +216,14 @@ class Reader {
     #onSectionLoad({ doc }) {
         doc.addEventListener('click', e => this.#onDocClick(e, doc))
         doc.addEventListener('keydown', e => this.#onKey(e))
-        doc.addEventListener('selectionchange', () => this.#onSelectionChange(doc))
+        if (!COARSE) doc.addEventListener('selectionchange', () => this.#onSelectionChange(doc))
+        this.#installLongPress(doc, (x, y) => {
+            const range = wordRangeAt(doc, x, y)
+            if (!range) return
+            const index = this.view.renderer.getContents().find(c => c.doc === doc)?.index ?? 0
+            this.#highlightRange({ cfi: this.view.getCFI(index, range) })
+            this.define(range.toString())
+        })
         if (this.kind === 'fixed') {
             let start = null
             doc.addEventListener('touchstart', e => { const t = e.touches[0]; start = { x: t.screenX, y: t.screenY, t: Date.now() } }, { passive: true })
@@ -207,6 +238,7 @@ class Reader {
     }
 
     #onDocClick(e, doc) {
+        if (Date.now() < (this.suppressTapUntil || 0)) return
         if (e.defaultPrevented || e.target.closest?.('a[href], button, input, select, textarea, video, audio, summary')) return
         if (this.dictOpen) { this.closeDictionary(); return }
         const sel = doc.getSelection?.()
@@ -290,13 +322,20 @@ class Reader {
 
         // Tap zones (single tap, delayed to leave room for double-tap zoom).
         let tapTimer = null
+        this.#installLongPress($('#pdf'), (x, y) => {
+            const range = wordRangeAt(document, x, y)
+            if (!range) return
+            this.#highlightRange({ range })
+            this.define(range.toString())
+        })
         $('#pdf').addEventListener('click', e => {
+            if (Date.now() < (this.suppressTapUntil || 0)) return
             if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; return }
             const x = e.clientX
             tapTimer = setTimeout(() => { tapTimer = null; this.#handleTap(x) }, 280)
         })
         window.addEventListener('keydown', e => this.#onKey(e))
-        document.addEventListener('selectionchange', () => {
+        if (!COARSE) document.addEventListener('selectionchange', () => {
             const sel = document.getSelection()
             if (sel?.anchorNode && $('#pdf').contains(sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentNode)) this.#onSelectionChange(document)
         })
@@ -331,6 +370,51 @@ class Reader {
     goPrev() { this.closeDictionary(); this.kind === 'pdf' ? this.pdf.prev() : this.view.goLeft() }
     goTo(href) { this.kind === 'pdf' ? this.pdf.goTo(href) : this.view.goTo(href).catch(console.error) }
     goToFraction(f) { this.kind === 'pdf' ? this.pdf.goToFraction(f) : this.view.goToFraction(f).catch(console.error) }
+
+    // ---------- press & hold ----------
+    #installLongPress(el, onPress) {
+        let timer = null, start = null, fired = false
+        const cancel = () => { clearTimeout(timer); timer = null }
+        el.addEventListener('touchstart', e => {
+            if (!this.settings?.defineOnSelect || e.touches.length !== 1) return
+            const t = e.touches[0]; start = { x: t.clientX, y: t.clientY }; fired = false
+            cancel()
+            timer = setTimeout(() => { timer = null; fired = true; onPress(start.x, start.y) }, 420)
+        }, { passive: true })
+        el.addEventListener('touchmove', e => {
+            if (!timer) return
+            const t = e.touches[0]
+            if (Math.hypot(t.clientX - start.x, t.clientY - start.y) > 10) cancel()
+        }, { passive: true })
+        el.addEventListener('touchend', e => {
+            cancel()
+            if (fired) { fired = false; this.suppressTapUntil = Date.now() + 600; if (e.cancelable) e.preventDefault() }
+        }, { passive: false })
+        el.addEventListener('touchcancel', cancel)
+    }
+
+    #highlightRange({ cfi, range }) {
+        this.#clearHighlight()
+        if (cfi && this.view) {
+            this.highlight = { value: cfi }
+            this.view.addAnnotation(this.highlight).catch?.(() => {})
+        } else if (range) {
+            const page = range.startContainer.parentElement?.closest('.page')
+            if (!page) return
+            const pr = page.getBoundingClientRect()
+            this.pdfHighlights = []
+            for (const r of range.getClientRects()) {
+                const d = document.createElement('div')
+                d.className = 'pdf-hl'
+                d.style.cssText = `left:${r.left - pr.left - 2}px;top:${r.top - pr.top - 1}px;width:${r.width + 4}px;height:${r.height + 2}px`
+                page.append(d); this.pdfHighlights.push(d)
+            }
+        }
+    }
+    #clearHighlight() {
+        if (this.highlight) { try { this.view?.deleteAnnotation(this.highlight) } catch { /* ignore */ } this.highlight = null }
+        this.pdfHighlights?.forEach(d => d.remove()); this.pdfHighlights = null
+    }
 
     // ---------- dictionary ----------
     #selectionTimer = null
@@ -379,7 +463,7 @@ class Reader {
         $('#dict-source').textContent = r.source
         const speakBtn = $('#dict-speak')
         speakBtn.hidden = !(r.audio || 'speechSynthesis' in window)
-        speakBtn.onclick = () => speak(r.word, r.audio)
+        speakBtn.onclick = () => { speakBtn.classList.add('playing'); Promise.resolve(speak(r.word, r.audio)).finally(() => setTimeout(() => speakBtn.classList.remove('playing'), 900)) }
         const more = $('#dict-more'); more.hidden = false; more.onclick = () => bridge.openExternal(r.url)
         const body = $('#dict-body')
         body.innerHTML = r.meanings.map(m => `
@@ -397,6 +481,7 @@ class Reader {
         this.dictOpen = false
         this.dictWord = null
         $('#dict-card').classList.add('hidden')
+        this.#clearHighlight()
         try { this.view?.deselect?.(); document.getSelection()?.removeAllRanges() } catch { /* ignore */ }
     }
 

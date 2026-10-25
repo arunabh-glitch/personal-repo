@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f7f2e8" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#15120f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fbf5ff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#17131f" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -18,24 +18,32 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
+<div class="blobs" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
+
 <header class="top">
   <div class="brand">
-    <svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><path class="page" d="M10 8a3 3 0 0 1 3-3h17l10 10v22a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z"/><path class="fold" d="M30 5v7a3 3 0 0 0 3 3h7z"/><path class="lines" d="M16 22h16M16 28h16M16 34h11" stroke-linecap="round"/></svg>
+    <svg class="mascot" viewBox="0 0 64 64" aria-hidden="true">
+      <path class="m-page" d="M14 10a4 4 0 0 1 4-4h22l14 14v30a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4z"/>
+      <path class="m-fold" d="M40 6v10a4 4 0 0 0 4 4h10z"/>
+      <circle class="m-eye" cx="26" cy="31" r="2.6"/><circle class="m-eye" cx="38" cy="31" r="2.6"/>
+      <path class="m-smile" d="M26 40q6 5 12 0" stroke-linecap="round"/>
+      <circle class="m-blush" cx="21" cy="37" r="2"/><circle class="m-blush" cx="43" cy="37" r="2"/>
+    </svg>
     <div>
-      <h1>Dogear</h1>
-      <p id="tagline" class="tagline">Fold the corner. Pick up where you left off.</p>
+      <h1><span class="hl">Dogear</span></h1>
+      <p id="tagline" class="tagline"></p>
     </div>
   </div>
   <div class="actions">
     <label class="sort-wrap"><span class="visually-hidden">Sort</span>
       <select id="sort" aria-label="Sort shelf">
-        <option value="recent">Recent</option>
-        <option value="title">Title</option>
-        <option value="author">Author</option>
-        <option value="added">Added</option>
+        <option value="recent">recent</option>
+        <option value="title">title</option>
+        <option value="author">author</option>
+        <option value="added">added</option>
       </select>
     </label>
-    <button id="btn-url" class="icon" aria-label="Add from a link" title="Add from a link">
+    <button id="btn-url" class="icon c-blue" aria-label="Add from a link" title="Add from a link">
       <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
     </button>
   </div>
@@ -43,13 +51,13 @@
 
 <main>
   <div id="install-hint" class="hint" hidden>
-    <div class="hint-fold" aria-hidden="true"></div>
-    <div><strong>Put Dogear on your home screen.</strong> In Safari, tap Share, then <strong>Add to Home Screen</strong>. It opens full screen and works offline.</div>
-    <button id="hint-close" class="link">Got it</button>
+    <span class="sticker s-sun">psst</span>
+    <div><strong>put Dogear on your home screen.</strong> In Safari tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>. Full screen, works offline, no app store.</div>
+    <button id="hint-close" class="link">got it</button>
   </div>
 
   <section id="continue" class="continue" hidden>
-    <p class="eyebrow">Continue reading</p>
+    <p class="eyebrow">keep going <span class="arrow">→</span></p>
     <button id="continue-card" class="continue-card">
       <div class="cc-cover"><img id="cc-img" alt="" hidden><div id="cc-ph" class="ph"></div></div>
       <div class="cc-text">
@@ -58,28 +66,30 @@
         <div id="cc-where" class="cc-where"></div>
         <div class="cc-bar"><i id="cc-bar"></i></div>
       </div>
+      <span class="cc-go">read</span>
     </button>
   </section>
 
   <section>
-    <p id="shelf-eyebrow" class="eyebrow" hidden>On the shelf</p>
+    <p id="shelf-eyebrow" class="eyebrow" hidden>the shelf</p>
     <div id="grid" class="grid"></div>
   </section>
 
   <div id="empty" class="empty" hidden>
-    <svg class="empty-art" viewBox="0 0 160 140" aria-hidden="true">
-      <path class="e-page" d="M34 22a6 6 0 0 1 6-6h56l30 30v66a6 6 0 0 1-6 6H40a6 6 0 0 1-6-6z"/>
-      <path class="e-fold" d="M96 16v24a6 6 0 0 0 6 6h24z"/>
-      <path class="e-lines" d="M50 62h60M50 76h60M50 90h42" stroke-linecap="round"/>
-      <path class="e-smile" d="M64 106q16 12 32 0" stroke-linecap="round"/>
+    <svg class="empty-art" viewBox="0 0 160 160" aria-hidden="true">
+      <path class="m-page" d="M38 24a8 8 0 0 1 8-8h50l34 34v70a8 8 0 0 1-8 8H46a8 8 0 0 1-8-8z"/>
+      <path class="m-fold" d="M96 16v26a8 8 0 0 0 8 8h26z"/>
+      <circle class="m-eye big" cx="66" cy="76" r="6"/><circle class="m-eye big" cx="98" cy="76" r="6"/>
+      <path class="m-smile big" d="M66 98q16 14 32 0" stroke-linecap="round"/>
+      <circle class="m-blush" cx="54" cy="90" r="5"/><circle class="m-blush" cx="110" cy="90" r="5"/>
     </svg>
-    <h2>Nothing folded yet</h2>
-    <p class="muted">Add an EPUB, PDF, MOBI, AZW3, FB2, CBZ, TXT or Markdown file from Files, iCloud Drive or Downloads. Long‑press a word while reading to look it up.</p>
+    <h2>nothing here yet</h2>
+    <p class="muted">add a book and I’ll hold your page. EPUB, PDF, MOBI, AZW3, FB2, CBZ, TXT, Markdown — bring it. hold any word while reading to get its meaning.</p>
   </div>
   <p id="storage" class="storage"></p>
 </main>
 
-<button id="fab" class="fab" aria-label="Add books"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg><span>Add books</span></button>
+<button id="fab" class="fab" aria-label="Add books"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg><span>add books</span></button>
 <input id="file-input" type="file" multiple hidden>
 
 <div id="sheet-scrim" class="scrim" hidden></div>
@@ -87,10 +97,10 @@
   <div class="grab"></div>
   <div class="sheet-title" id="sheet-title"></div>
   <div class="sheet-sub" id="sheet-sub"></div>
-  <button class="sheet-btn" data-act="open">Open</button>
-  <button class="sheet-btn" data-act="details">Details</button>
-  <button class="sheet-btn danger" data-act="delete">Remove from shelf</button>
-  <button class="sheet-btn" data-act="cancel">Cancel</button>
+  <button class="sheet-btn" data-act="open">open</button>
+  <button class="sheet-btn" data-act="details">details</button>
+  <button class="sheet-btn danger" data-act="delete">remove from shelf</button>
+  <button class="sheet-btn" data-act="cancel">never mind</button>
 </div>
 
 <div id="toast" class="toast" hidden></div>

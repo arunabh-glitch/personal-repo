@@ -17,13 +17,14 @@ const coverUrl = book => {
     return urls.get(book.id)
 }
 const pctOf = b => Math.round((b.progress || 0) * 100)
-const badgeFor = b => { const p = pctOf(b); return p >= 100 ? 'Finished' : p > 0 ? p + '%' : b.progress > 0 ? '<1%' : formatLabel(b.format) }
+const badgeFor = b => { const p = pctOf(b); return p >= 100 ? 'done ✓' : p > 0 ? p + '%' : b.progress > 0 ? 'just started' : formatLabel(b.format) }
 
 const taglines = [
-    'Fold the corner. Pick up where you left off.',
-    'Long‑press a word to look it up.',
-    'Your books, your phone, no account.',
-    'Reads EPUB, PDF, MOBI, FB2, CBZ and more.',
+    'bookworm era ✨',
+    'one more chapter. promise.',
+    'hold a word → instant meaning',
+    'no account, no ads, just books',
+    'fold the corner, come back later',
 ]
 
 const render = () => {
@@ -43,14 +44,14 @@ const render = () => {
         $('#cc-ph').hidden = !!url
         $('#cc-title').textContent = current.title
         $('#cc-author').textContent = current.author || formatLabel(current.format)
-        $('#cc-where').textContent = current.progressLabel ? `${current.progressLabel} · ${pctOf(current)}%` : (current.progress > 0 ? `${pctOf(current)}% read` : 'Just started')
+        $('#cc-where').textContent = current.progressLabel ? `${current.progressLabel} · ${pctOf(current)}%` : (current.progress > 0 ? `${pctOf(current)}% in` : 'just started')
         $('#cc-bar').style.width = Math.max(1, pctOf(current)) + '%'
         $('#continue-card').onclick = () => open(current)
     }
 
     const inProgress = books.filter(b => b.progress > 0 && b.progress < 0.98).length
     $('#tagline').textContent = books.length
-        ? `${books.length} book${books.length === 1 ? '' : 's'} on the shelf${inProgress ? ` · ${inProgress} with a corner folded` : ''}`
+        ? `${books.length} book${books.length === 1 ? '' : 's'}${inProgress ? ` · ${inProgress} in progress` : ''} · ${taglines[Math.floor(Date.now() / 60000) % taglines.length]}`
         : taglines[Math.floor(Date.now() / 60000) % taglines.length]
     $('#shelf-eyebrow').hidden = !books.length
 
@@ -73,7 +74,7 @@ const render = () => {
         grid.append(card)
     }
     empty.hidden = list.length > 0
-    library.usage().then(u => { $('#storage').textContent = u && u.quota ? `${fmtSize(u.used)} used · ${fmtSize(u.quota - u.used)} free on this device` : '' })
+    library.usage().then(u => { $('#storage').textContent = u && u.quota ? `${fmtSize(u.used)} of books · ${fmtSize(u.quota - u.used)} free` : '' })
 }
 
 const open = book => { location.href = `reader/index.html?id=${encodeURIComponent(book.id)}` }
@@ -94,7 +95,7 @@ $('#sheet').addEventListener('click', async e => {
     if (act === 'open') open(b)
     else if (act === 'details') alert(`${b.title}\n${b.author || 'Unknown author'}\n${formatLabel(b.format)} · ${fmtSize(b.size)}\n${b.progressLabel || 'Not started'} (${pctOf(b)}%)\nAdded ${new Date(b.addedAt).toLocaleString()}${b.sourceUrl ? '\n' + b.sourceUrl : ''}`)
     else if (act === 'delete') {
-        if (confirm(`Remove “${b.title}” from your shelf?`)) { await library.remove(b.id); urls.delete(b.id); await reload(); toast('Removed') }
+        if (confirm(`remove “${b.title}” from your shelf?`)) { await library.remove(b.id); urls.delete(b.id); await reload(); toast('gone 👋') }
     }
     hideSheet()
 })
@@ -110,8 +111,8 @@ const importFiles = async files => {
     }
     busy(false)
     await reload()
-    if (failed.length) toast(`Couldn’t add: ${failed.join(', ')}`, 4000)
-    else toast(ok === 1 ? 'Added to your shelf' : `Added ${ok} books`)
+    if (failed.length) toast(`couldn’t add: ${failed.join(', ')}`, 4000)
+    else toast(ok === 1 ? 'on the shelf ✨' : `${ok} books on the shelf ✨`)
     if (ok) library.persist()
 }
 
@@ -133,7 +134,7 @@ $('#btn-url').addEventListener('click', async () => {
         if (m) name = decodeURIComponent(m[1])
         if (!detectFormat(name, blob.type)) throw new Error('Unsupported file type')
         await library.importFile(new File([blob], name, { type: blob.type }), url)
-        await reload(); toast('Added to your shelf'); library.persist()
+        await reload(); toast('on the shelf ✨'); library.persist()
     } catch (e) {
         console.error(e)
         toast(e.name === 'TypeError' ? 'That site blocks downloads from web apps. Save the file in Safari first, then add it from Files.' : `Download failed: ${e.message}`, 5000)

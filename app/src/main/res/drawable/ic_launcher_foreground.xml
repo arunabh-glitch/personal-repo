@@ -1,11 +1,17 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- A page with a folded (dog-eared) corner -->
-    <path android:fillColor="#F7F2E8"
-        android:pathData="M32,29 C32,26.2 34.2,24 37,24 L63,24 L78,39 L78,79 C78,81.8 75.8,84 73,84 L37,84 C34.2,84 32,81.8 32,79 Z" />
-    <path android:fillColor="#F2B544"
-        android:pathData="M63,24 L63,35 C63,37.2 64.8,39 67,39 L78,39 Z" />
-    <path android:fillColor="#E4572E" android:fillAlpha="0.55"
-        android:pathData="M40,50 L66,50 C67.1,50 68,50.9 68,52 C68,53.1 67.1,54 66,54 L40,54 C38.9,54 38,53.1 38,52 C38,50.9 38.9,50 40,50 Z M40,59 L66,59 C67.1,59 68,59.9 68,61 C68,62.1 67.1,63 66,63 L40,63 C38.9,63 38,62.1 38,61 C38,59.9 38.9,59 40,59 Z M40,68 L58,68 C59.1,68 60,68.9 60,70 C60,71.1 59.1,72 58,72 L40,72 C38.9,72 38,71.1 38,70 C38,68.9 38.9,68 40,68 Z" />
+    <!-- Dogear mascot: a page with a folded corner and a face -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M31,30 C31,27.2 33.2,25 36,25 L62,25 L78,41 L78,78 C78,80.8 75.8,83 73,83 L36,83 C33.2,83 31,80.8 31,78 Z" />
+    <path android:fillColor="#1E1636" android:fillAlpha="0.9"
+        android:pathData="M36,22.5 C31.9,22.5 28.5,25.9 28.5,30 L28.5,78 C28.5,82.1 31.9,85.5 36,85.5 L73,85.5 C77.1,85.5 80.5,82.1 80.5,78 L80.5,40 L63,22.5 Z M36,27.5 L61,27.5 L75.5,42 L75.5,78 C75.5,79.4 74.4,80.5 73,80.5 L36,80.5 C34.6,80.5 33.5,79.4 33.5,78 L33.5,30 C33.5,28.6 34.6,27.5 36,27.5 Z" />
+    <path android:fillColor="#FF5CA8"
+        android:pathData="M62,25 L62,37 C62,39.2 63.8,41 66,41 L78,41 Z" />
+    <path android:fillColor="#1E1636"
+        android:pathData="M45.5,54 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0 Z M62.5,54 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0 Z" />
+    <path android:fillColor="#1E1636"
+        android:pathData="M46,63 C48,66.5 51,68 54,68 C57,68 60,66.5 62,63 L59.6,61.6 C58.2,64 56.3,65 54,65 C51.7,65 49.8,64 48.4,61.6 Z" />
+    <path android:fillColor="#FF5CA8" android:fillAlpha="0.6"
+        android:pathData="M40,61 m-2.4,0 a2.4,2.4 0 1,0 4.8,0 a2.4,2.4 0 1,0 -4.8,0 Z M68,61 m-2.4,0 a2.4,2.4 0 1,0 4.8,0 a2.4,2.4 0 1,0 -4.8,0 Z" />
 </vector>
