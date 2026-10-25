@@ -148,7 +148,16 @@ const standalone = window.matchMedia('(display-mode: standalone)').matches || na
 if (isIOS && !standalone && !localStorage.getItem('dogear.hint')) $('#install-hint').hidden = false
 $('#hint-close').addEventListener('click', () => { $('#install-hint').hidden = true; localStorage.setItem('dogear.hint', '1') })
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn('sw', e))
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(e => console.warn('sw', e))
+    // When an updated worker takes over, reload once so markup, styles and scripts all come from the same version.
+    const hadController = !!navigator.serviceWorker.controller // false on the very first visit: no reload then
+    let refreshing = false
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing || !hadController) return
+        refreshing = true; location.reload()
+    })
+}
 window.addEventListener('pageshow', e => { if (e.persisted) reload() })
 document.addEventListener('visibilitychange', () => { if (!document.hidden) reload() })
 
