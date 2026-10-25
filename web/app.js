@@ -19,15 +19,10 @@ const coverUrl = book => {
 const pctOf = b => Math.round((b.progress || 0) * 100)
 const badgeFor = b => { const p = pctOf(b); return p >= 100 ? 'done ✓' : p > 0 ? p + '%' : b.progress > 0 ? 'just started' : formatLabel(b.format) }
 
-const taglines = [
-    'bookworm era ✨',
-    'one more chapter. promise.',
-    'hold a word → instant meaning',
-    'no account, no ads, just books',
-    'fold the corner, come back later',
-]
 
 const render = () => {
+    for (const u of urls.values()) URL.revokeObjectURL(u)
+    urls.clear()
     const sort = localStorage.getItem(SORT_KEY) || 'recent'
     $('#sort').value = sort
     const list = [...books].sort((a, b) => sort === 'title' ? a.title.localeCompare(b.title)
@@ -42,6 +37,8 @@ const render = () => {
         const url = coverUrl(current)
         $('#cc-img').hidden = !url; if (url) $('#cc-img').src = url
         $('#cc-ph').hidden = !!url
+        $('#cc-ph').textContent = current.title
+        $('#cc-img').onerror = () => { $('#cc-img').hidden = true; $('#cc-ph').hidden = false }
         $('#cc-title').textContent = current.title
         $('#cc-author').textContent = current.author || formatLabel(current.format)
         $('#cc-where').textContent = current.progressLabel ? `${current.progressLabel} · ${pctOf(current)}%` : (current.progress > 0 ? `${pctOf(current)}% in` : 'just started')
@@ -49,10 +46,6 @@ const render = () => {
         $('#continue-card').onclick = () => open(current)
     }
 
-    const inProgress = books.filter(b => b.progress > 0 && b.progress < 0.98).length
-    $('#tagline').textContent = books.length
-        ? `${books.length} book${books.length === 1 ? '' : 's'}${inProgress ? ` · ${inProgress} in progress` : ''} · ${taglines[Math.floor(Date.now() / 60000) % taglines.length]}`
-        : taglines[Math.floor(Date.now() / 60000) % taglines.length]
     $('#shelf-eyebrow').hidden = !books.length
 
     grid.textContent = ''
@@ -64,6 +57,9 @@ const render = () => {
         card.innerHTML = `<div class="cover">${url ? `<img alt="" src="${url}">` : `<div class="ph"><span>${esc(b.title)}</span>${b.author ? `<small>${esc(b.author)}</small>` : ''}</div>`}
             <i class="ear" aria-hidden="true"></i><span class="badge">${badgeFor(b)}</span>${b.progress > 0 ? `<div class="bar"><i style="width:${Math.max(1, pct)}%"></i></div>` : ''}</div>
             <div class="t">${esc(b.title)}</div><div class="a">${esc(b.author || formatLabel(b.format))}</div>`
+        card.querySelector('img')?.addEventListener('error', e => {
+            e.target.outerHTML = `<div class="ph"><span>${esc(b.title)}</span>${b.author ? `<small>${esc(b.author)}</small>` : ''}</div>`
+        })
         card.addEventListener('click', () => open(b))
         let timer
         const start = () => { timer = setTimeout(() => { timer = null; showSheet(b) }, 550) }
