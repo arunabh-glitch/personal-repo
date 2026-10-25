@@ -1,17 +1,20 @@
-# OpenShelf
+# Dogear
 
-An Android e-book reader. Open books from anywhere on your phone or from free online catalogs, and pick up where you left off.
+A cosy e-book reader with a built-in dictionary. Fold the corner, pick up where you left off.
+
+Runs as an Android app and as an installable web app for iPhone, iPad and desktop.
 
 **Formats:** EPUB (2 and 3, including fixed layout), PDF, MOBI, AZW / AZW3 (KF8), FB2 / FB2.zip, CBZ comics, plain text, Markdown and HTML.
 
 **Sources**
 - Import from any file manager or cloud drive via the system file picker (multi-select).
-- "Open with" / "Share to OpenShelf" from other apps (mail attachments, browsers, Telegram, Drive…).
+- "Open with" / "Share to Dogear" from other apps (mail attachments, browsers, Telegram, Drive…).
 - Built-in OPDS catalogs: Project Gutenberg, Standard Ebooks, Feedbooks, Unglue.it, Internet Archive — browse, search and download straight into the library.
 - Add your own OPDS catalog (Calibre-Web, Kavita, Komga, Calibre content server, …).
 - Download a book from a direct URL.
 
 **Reader**
+- Long-press (or double-tap) any word to see its meaning, pronunciation and examples without leaving the page. Looked-up words are cached, so they work offline afterwards. Works in EPUBs, PDFs and text files.
 - Pagination or continuous scroll, swipe or tap zones (left = back, right = forward, centre = menu).
 - Themes (light, sepia, dusk, dark), text size, line spacing, margins, font family, justification.
 - Table of contents, in-book search, progress slider, chapter/page indicator.
@@ -25,7 +28,7 @@ The same reader ships as an installable web app (`web/`). It keeps your books in
 private storage, works offline, and opens full screen from the home screen.
 
 **Install on iPhone:** open the hosted URL in Safari, tap **Share → Add to Home Screen**. Then open
-OpenShelf from the home screen, tap **+** and pick books from Files, iCloud Drive or Downloads.
+Dogear from the home screen, tap **+** and pick books from Files, iCloud Drive or Downloads.
 
 Limits compared with the Android app: no "Open with" from other apps (use **+** or the Share sheet's
 "Save to Files" first), and catalog downloads only work from sites that allow cross-origin requests.
@@ -89,4 +92,4 @@ app/src/main/assets/reader/   index.html, reader.js, reader.css, pdf-viewer.js, 
 
 ## Licenses
 
-OpenShelf is MIT licensed. Bundled libraries: foliate-js (MIT), pdf.js (Apache-2.0), zip.js (BSD-3), fflate (MIT).
+Dogear is MIT licensed. Bundled: foliate-js (MIT), pdf.js (Apache-2.0), zip.js (BSD-3), fflate (MIT), Fraunces typeface (SIL OFL). Definitions come from the free Dictionary API and Wiktionary.

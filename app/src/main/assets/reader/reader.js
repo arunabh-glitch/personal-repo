@@ -1,13 +1,14 @@
 import './foliate/view.js'
 import { makeTextBook, isTextFormat } from './text-book.js'
 import { createWebBridge } from './web-bridge.js'
+import { lookup, speak, selectedPhrase, normalizeWord } from './dictionary.js'
 
 const $ = s => document.querySelector(s)
 const $$ = s => Array.from(document.querySelectorAll(s))
 
 const DEFAULTS = {
     theme: 'light', fontSize: 18, lineHeight: 1.5, margin: 24, fontFamily: 'publisher',
-    flow: 'paginated', justify: true, hyphenate: true, pdfZoom: 1, keepScreenOn: false,
+    flow: 'paginated', justify: true, hyphenate: true, pdfZoom: 1, keepScreenOn: false, defineOnSelect: true,
 }
 const THEMES = {
     light: { bg: '#ffffff', fg: '#1b1b1b', link: '#1a5fb4', dark: false, force: false },
@@ -59,6 +60,7 @@ const formatContributor = c => {
 }
 const formatTitle = t => !t ? '' : typeof t === 'string' ? t : Object.values(t)[0] ?? ''
 const percent = new Intl.NumberFormat('en', { style: 'percent' })
+const escapeHTML = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const phase = p => { globalThis.__phase = p; console.log('phase: ' + p) }
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms) } }
 
@@ -100,7 +102,7 @@ class Reader {
         if (!localStorage.getItem('hint-shown')) {
             localStorage.setItem('hint-shown', '1')
             const hint = $('#tap-hint')
-            hint.innerHTML = '<div>◀ previous</div><div>menu</div><div>next ▶</div>'
+            hint.innerHTML = '<div>← back a page</div><div>tap for menu</div><div>next page →</div>'
             hint.hidden = false
             setTimeout(() => hint.hidden = true, 2200)
         }
@@ -190,6 +192,7 @@ class Reader {
     #onSectionLoad({ doc }) {
         doc.addEventListener('click', e => this.#onDocClick(e, doc))
         doc.addEventListener('keydown', e => this.#onKey(e))
+        doc.addEventListener('selectionchange', () => this.#onSelectionChange(doc))
         if (this.kind === 'fixed') {
             let start = null
             doc.addEventListener('touchstart', e => { const t = e.touches[0]; start = { x: t.screenX, y: t.screenY, t: Date.now() } }, { passive: true })
@@ -205,6 +208,7 @@ class Reader {
 
     #onDocClick(e, doc) {
         if (e.defaultPrevented || e.target.closest?.('a[href], button, input, select, textarea, video, audio, summary')) return
+        if (this.dictOpen) { this.closeDictionary(); return }
         const sel = doc.getSelection?.()
         if (sel && !sel.isCollapsed) return
         const frame = doc.defaultView?.frameElement
@@ -219,6 +223,7 @@ class Reader {
 
     #handleTap(x) {
         const w = window.innerWidth
+        if (this.dictOpen) { this.closeDictionary(); return }
         if (this.barsVisible) { this.showBars(false); return }
         if (x < w * 0.3) this.goPrev()
         else if (x > w * 0.7) this.goNext()
@@ -239,6 +244,7 @@ class Reader {
         this.lastFraction = fraction
         this.lastCfi = cfi
         $('#slider').value = fraction
+        $('#slider').style.setProperty('--pct', (fraction * 100) + '%')
         const label = tocItem?.label ?? ''
         $('#status-left').textContent = label
         $('#status-right').textContent = pageItem ? `Page ${pageItem.label}` :
@@ -265,6 +271,7 @@ class Reader {
             const { page, total, fraction } = e.detail
             this.lastFraction = fraction
             $('#slider').value = fraction
+            $('#slider').style.setProperty('--pct', (fraction * 100) + '%')
             $('#status-left').textContent = this.#pdfTocLabel(page) ?? ''
             $('#status-right').textContent = `Page ${page} of ${total}`
             this.#highlightToc(`page:${this.#nearestOutlinePage(page)}`)
@@ -289,6 +296,10 @@ class Reader {
             tapTimer = setTimeout(() => { tapTimer = null; this.#handleTap(x) }, 280)
         })
         window.addEventListener('keydown', e => this.#onKey(e))
+        document.addEventListener('selectionchange', () => {
+            const sel = document.getSelection()
+            if (sel?.anchorNode && $('#pdf').contains(sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentNode)) this.#onSelectionChange(document)
+        })
 
         if (this.info.needsMetadata) {
             let cover = null
@@ -316,10 +327,78 @@ class Reader {
     }
 
     // ---------- navigation ----------
-    goNext() { this.kind === 'pdf' ? this.pdf.next() : this.view.goRight() }
-    goPrev() { this.kind === 'pdf' ? this.pdf.prev() : this.view.goLeft() }
+    goNext() { this.closeDictionary(); this.kind === 'pdf' ? this.pdf.next() : this.view.goRight() }
+    goPrev() { this.closeDictionary(); this.kind === 'pdf' ? this.pdf.prev() : this.view.goLeft() }
     goTo(href) { this.kind === 'pdf' ? this.pdf.goTo(href) : this.view.goTo(href).catch(console.error) }
     goToFraction(f) { this.kind === 'pdf' ? this.pdf.goToFraction(f) : this.view.goToFraction(f).catch(console.error) }
+
+    // ---------- dictionary ----------
+    #selectionTimer = null
+    #onSelectionChange(doc) {
+        if (!this.settings.defineOnSelect) return
+        clearTimeout(this.#selectionTimer)
+        this.#selectionTimer = setTimeout(() => {
+            const phrase = selectedPhrase(doc.getSelection?.())
+            if (!phrase) return
+            if (this.dictOpen && normalizeWord(phrase).toLowerCase() === (this.dictWord || '').toLowerCase()) return
+            this.define(phrase)
+        }, 450)
+    }
+
+    async define(phrase) {
+        const word = normalizeWord(phrase)
+        if (!word) return
+        this.dictWord = word
+        this.dictOpen = true
+        const card = $('#dict-card')
+        card.classList.remove('hidden')
+        $('#dict-word').textContent = word
+        $('#dict-phon').textContent = ''
+        $('#dict-source').textContent = ''
+        $('#dict-speak').hidden = true
+        $('#dict-more').hidden = true
+        const body = $('#dict-body')
+        body.innerHTML = '<div class="dict-loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>'
+        let result = null, error = null
+        try { result = await lookup(word) } catch (e) { error = e }
+        if (this.dictWord !== word) return // superseded
+        if (result) this.#renderDefinition(result)
+        else {
+            const wikt = `https://en.wiktionary.org/wiki/${encodeURIComponent(word)}`
+            body.innerHTML = error
+                ? `<p class="dict-empty">${error.message === 'offline' || !navigator.onLine ? 'You’re offline. Definitions need a connection the first time you look a word up; after that they’re saved on this device.' : 'Couldn’t reach the dictionary right now.'}</p>`
+                : `<p class="dict-empty">No entry for “${escapeHTML(word)}”. Try the root word, or search the web.</p>`
+            $('#dict-more').hidden = false
+            $('#dict-more').onclick = () => bridge.openExternal(wikt)
+        }
+    }
+
+    #renderDefinition(r) {
+        $('#dict-word').textContent = r.word
+        $('#dict-phon').textContent = r.phonetic || ''
+        $('#dict-source').textContent = r.source
+        const speakBtn = $('#dict-speak')
+        speakBtn.hidden = !(r.audio || 'speechSynthesis' in window)
+        speakBtn.onclick = () => speak(r.word, r.audio)
+        const more = $('#dict-more'); more.hidden = false; more.onclick = () => bridge.openExternal(r.url)
+        const body = $('#dict-body')
+        body.innerHTML = r.meanings.map(m => `
+            <section class="dict-meaning">
+                <span class="dict-pos">${escapeHTML(m.pos || '')}</span>
+                <ol class="dict-defs">${m.defs.map(d => `<li>${escapeHTML(d.def)}${d.example ? `<em class="dict-ex">“${escapeHTML(d.example)}”</em>` : ''}</li>`).join('')}</ol>
+                ${m.synonyms?.length ? `<p class="dict-syn">${m.synonyms.map(x => `<button class="dict-chip" data-word="${escapeHTML(x)}">${escapeHTML(x)}</button>`).join('')}</p>` : ''}
+            </section>`).join('')
+        body.querySelectorAll('.dict-chip').forEach(b => b.addEventListener('click', () => this.define(b.dataset.word)))
+        body.scrollTop = 0
+    }
+
+    closeDictionary() {
+        if (!this.dictOpen) return
+        this.dictOpen = false
+        this.dictWord = null
+        $('#dict-card').classList.add('hidden')
+        try { this.view?.deselect?.(); document.getSelection()?.removeAllRanges() } catch { /* ignore */ }
+    }
 
     // ---------- chrome ----------
     showBars(v) {
@@ -336,11 +415,12 @@ class Reader {
     }
     closePanels() {
         let closed = false
-        for (const p of $$('.panel')) if (!p.classList.contains('hidden')) { p.classList.add('hidden'); closed = true }
+        for (const p of $$('.panel:not(.dict)')) if (!p.classList.contains('hidden')) { p.classList.add('hidden'); closed = true }
         $('#scrim').classList.add('hidden')
         return closed
     }
     onBack() {
+        if (this.dictOpen) { this.closeDictionary(); return true }
         if (this.closePanels()) return true
         if (this.barsVisible) { this.showBars(false); return true }
         return false
@@ -357,13 +437,13 @@ class Reader {
         $('#btn-prev-ch').addEventListener('click', () => this.goPrev())
         $('#btn-next-ch').addEventListener('click', () => this.goNext())
         const slider = $('#slider')
-        slider.addEventListener('input', () => { $('#status-right').textContent = percent.format(+slider.value) })
+        slider.addEventListener('input', () => { $('#status-right').textContent = percent.format(+slider.value); slider.style.setProperty('--pct', (+slider.value * 100) + '%') })
         slider.addEventListener('change', () => this.goToFraction(+slider.value))
         $('#book').addEventListener('click', e => { if (e.target === $('#book') || e.target.tagName === 'FOLIATE-VIEW') this.#handleTap(e.clientX) })
         window.addEventListener('keydown', e => { if (this.kind !== 'pdf') this.#onKey(e) })
 
         // settings
-        $$('#theme-chips .chip').forEach(c => c.addEventListener('click', () => this.#update({ theme: c.dataset.theme })))
+        $$('#theme-chips [data-theme]').forEach(c => c.addEventListener('click', () => this.#update({ theme: c.dataset.theme })))
         $$('[data-flow]').forEach(c => c.addEventListener('click', () => this.#update({ flow: c.dataset.flow })))
         $$('[data-step]').forEach(b => b.addEventListener('click', () => {
             const k = b.dataset.step, d = +b.dataset.delta
@@ -374,6 +454,8 @@ class Reader {
         $('#sel-font').addEventListener('change', e => this.#update({ fontFamily: e.target.value }))
         $('#chk-justify').addEventListener('change', e => this.#update({ justify: e.target.checked }))
         $('#chk-wake').addEventListener('change', e => this.#update({ keepScreenOn: e.target.checked }))
+        $('#chk-define').addEventListener('change', e => this.#update({ defineOnSelect: e.target.checked }))
+        $('#dict-close').addEventListener('click', () => this.closeDictionary())
 
         // search
         const input = $('#search-input')
@@ -395,7 +477,7 @@ class Reader {
 
     #syncSettingsUI() {
         const s = this.settings
-        $$('#theme-chips .chip').forEach(c => c.classList.toggle('active', c.dataset.theme === s.theme))
+        $$('#theme-chips [data-theme]').forEach(c => c.classList.toggle('active', c.dataset.theme === s.theme))
         $$('[data-flow]').forEach(c => c.classList.toggle('active', c.dataset.flow === s.flow))
         $('#val-fontSize').textContent = s.fontSize
         $('#val-lineHeight').textContent = s.lineHeight.toFixed(1)
@@ -404,6 +486,7 @@ class Reader {
         $('#sel-font').value = s.fontFamily
         $('#chk-justify').checked = !!s.justify
         $('#chk-wake').checked = !!s.keepScreenOn
+        $('#chk-define').checked = s.defineOnSelect !== false
     }
 
     #buildToc(items) {

@@ -217,6 +217,7 @@ export class PdfViewer extends EventTarget {
             p.el.prepend(canvas)
             p.rendered = true
             p.scaleRendered = scale
+            this.#renderTextLayer(p, page, scale).catch(e => console.warn('text layer', e))
         } catch (e) {
             if (e?.name !== 'RenderingCancelledException') console.error(e)
         } finally {
@@ -230,7 +231,23 @@ export class PdfViewer extends EventTarget {
         p.task?.cancel()
         p.canvas?.remove()
         p.canvas = null
+        p.textLayer?.remove()
+        p.textLayer = null
         p.rendered = false
+    }
+
+    // Selectable (invisible) text on top of the canvas, so words can be looked up.
+    async #renderTextLayer(p, page, scale) {
+        if (!pdfjsLib.TextLayer) return
+        p.textLayer?.remove()
+        const div = document.createElement('div')
+        div.className = 'textLayer'
+        div.style.setProperty('--scale-factor', String(scale))
+        p.el.append(div)
+        p.textLayer = div
+        const layer = new pdfjsLib.TextLayer({ textContentSource: page.streamTextContent(), container: div, viewport: page.getViewport({ scale }) })
+        await layer.render()
+        if (p.textLayer !== div) div.remove() // superseded while rendering
     }
 
     #onScroll() {
@@ -287,7 +304,7 @@ export class PdfViewer extends EventTarget {
         // double tap toggles zoom
         c.addEventListener('click', e => {
             const now = performance.now()
-            if (now - lastTap < 300) {
+            if (now - lastTap < 300 && !document.getSelection()?.toString().trim()) {
                 const rect = c.getBoundingClientRect()
                 this.setZoom(this.zoom > 1.01 ? 1 : 2, { x: e.clientX - rect.left, y: e.clientY - rect.top })
                 lastTap = 0

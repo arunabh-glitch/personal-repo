@@ -1,0 +1,3 @@
+Fraunces (https://github.com/undercasetype/Fraunces) by Undercase Type.
+Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
+Variable font, latin subset, served by Google Fonts.

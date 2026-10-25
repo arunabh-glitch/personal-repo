@@ -4,13 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#5B4636">
+<meta name="theme-color" content="#f7f2e8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15120f" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="OpenShelf">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src *; frame-src blob: data:; worker-src 'self' blob:; form-action 'none';">
-<title>OpenShelf</title>
+<meta name="apple-mobile-web-app-title" content="Dogear">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; connect-src *; frame-src blob: data:; worker-src 'self' blob:; form-action 'none';">
+<title>Dogear</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/icon-192.png">
@@ -18,15 +19,23 @@
 </head>
 <body>
 <header class="top">
-  <h1>Library</h1>
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><path class="page" d="M10 8a3 3 0 0 1 3-3h17l10 10v22a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z"/><path class="fold" d="M30 5v7a3 3 0 0 0 3 3h7z"/><path class="lines" d="M16 22h16M16 28h16M16 34h11" stroke-linecap="round"/></svg>
+    <div>
+      <h1>Dogear</h1>
+      <p id="tagline" class="tagline">Fold the corner. Pick up where you left off.</p>
+    </div>
+  </div>
   <div class="actions">
-    <select id="sort" aria-label="Sort">
-      <option value="recent">Recent</option>
-      <option value="title">Title</option>
-      <option value="author">Author</option>
-      <option value="added">Date added</option>
-    </select>
-    <button id="btn-url" class="icon" aria-label="Add from URL" title="Add from URL">
+    <label class="sort-wrap"><span class="visually-hidden">Sort</span>
+      <select id="sort" aria-label="Sort shelf">
+        <option value="recent">Recent</option>
+        <option value="title">Title</option>
+        <option value="author">Author</option>
+        <option value="added">Added</option>
+      </select>
+    </label>
+    <button id="btn-url" class="icon" aria-label="Add from a link" title="Add from a link">
       <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
     </button>
   </div>
@@ -34,28 +43,53 @@
 
 <main>
   <div id="install-hint" class="hint" hidden>
-    <strong>Install on your iPhone:</strong> tap the Share button in Safari, then <strong>Add to Home Screen</strong>. OpenShelf then opens full screen and works offline.
-    <button id="hint-close" class="link">Dismiss</button>
+    <div class="hint-fold" aria-hidden="true"></div>
+    <div><strong>Put Dogear on your home screen.</strong> In Safari, tap Share, then <strong>Add to Home Screen</strong>. It opens full screen and works offline.</div>
+    <button id="hint-close" class="link">Got it</button>
   </div>
-  <div id="grid" class="grid"></div>
+
+  <section id="continue" class="continue" hidden>
+    <p class="eyebrow">Continue reading</p>
+    <button id="continue-card" class="continue-card">
+      <div class="cc-cover"><img id="cc-img" alt="" hidden><div id="cc-ph" class="ph"></div></div>
+      <div class="cc-text">
+        <div id="cc-title" class="cc-title"></div>
+        <div id="cc-author" class="cc-author"></div>
+        <div id="cc-where" class="cc-where"></div>
+        <div class="cc-bar"><i id="cc-bar"></i></div>
+      </div>
+    </button>
+  </section>
+
+  <section>
+    <p id="shelf-eyebrow" class="eyebrow" hidden>On the shelf</p>
+    <div id="grid" class="grid"></div>
+  </section>
+
   <div id="empty" class="empty" hidden>
-    <div class="empty-art">📚</div>
-    <p>Your shelf is empty.</p>
-    <p class="muted">Tap <strong>+</strong> to add EPUB, PDF, MOBI, AZW3, FB2, CBZ, TXT or Markdown files from Files, iCloud Drive or Downloads.</p>
+    <svg class="empty-art" viewBox="0 0 160 140" aria-hidden="true">
+      <path class="e-page" d="M34 22a6 6 0 0 1 6-6h56l30 30v66a6 6 0 0 1-6 6H40a6 6 0 0 1-6-6z"/>
+      <path class="e-fold" d="M96 16v24a6 6 0 0 0 6 6h24z"/>
+      <path class="e-lines" d="M50 62h60M50 76h60M50 90h42" stroke-linecap="round"/>
+      <path class="e-smile" d="M64 106q16 12 32 0" stroke-linecap="round"/>
+    </svg>
+    <h2>Nothing folded yet</h2>
+    <p class="muted">Add an EPUB, PDF, MOBI, AZW3, FB2, CBZ, TXT or Markdown file from Files, iCloud Drive or Downloads. Long‑press a word while reading to look it up.</p>
   </div>
-  <p id="storage" class="storage muted"></p>
+  <p id="storage" class="storage"></p>
 </main>
 
-<button id="fab" class="fab" aria-label="Add books">+</button>
+<button id="fab" class="fab" aria-label="Add books"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg><span>Add books</span></button>
 <input id="file-input" type="file" multiple hidden>
 
 <div id="sheet-scrim" class="scrim" hidden></div>
 <div id="sheet" class="sheet" hidden>
+  <div class="grab"></div>
   <div class="sheet-title" id="sheet-title"></div>
   <div class="sheet-sub" id="sheet-sub"></div>
   <button class="sheet-btn" data-act="open">Open</button>
   <button class="sheet-btn" data-act="details">Details</button>
-  <button class="sheet-btn danger" data-act="delete">Remove from library</button>
+  <button class="sheet-btn danger" data-act="delete">Remove from shelf</button>
   <button class="sheet-btn" data-act="cancel">Cancel</button>
 </div>
 

@@ -1,6 +1,6 @@
 // Offline cache for OpenShelf. The precache list and version are filled in by build.mjs.
 const VERSION = '__VERSION__'
-const CACHE = 'openshelf-' + VERSION
+const CACHE = 'dogear-' + VERSION
 const PRECACHE = __PRECACHE__
 
 self.addEventListener('install', e => {

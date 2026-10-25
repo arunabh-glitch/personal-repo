@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="color-scheme" content="light dark">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' blob: 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; connect-src 'self' blob: data:; frame-src blob: data:; object-src blob: data:; worker-src 'self' blob:; form-action 'none';">
-<title>OpenShelf Reader</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' blob: 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; media-src 'self' blob: data: https://api.dictionaryapi.dev https://*.wiktionary.org https://upload.wikimedia.org; connect-src 'self' blob: data: https://api.dictionaryapi.dev https://en.wiktionary.org; frame-src blob: data:; object-src blob: data:; worker-src 'self' blob:; form-action 'none';">
+<title>Dogear</title>
 <link rel="stylesheet" href="reader.css">
 </head>
 <body data-theme="light">
@@ -14,15 +14,15 @@
 
 <div id="tap-hint" hidden></div>
 
-<div id="loading"><div class="spinner"></div><div id="loading-text">Opening…</div></div>
+<div id="loading"><div class="mark"><span></span></div><div id="loading-text">Opening…</div></div>
 <div id="error" hidden>
   <h2>Can’t open this book</h2>
   <p id="error-text"></p>
-  <button id="error-back" class="btn">Back to library</button>
+  <button id="error-back" class="btn">Back to shelf</button>
 </div>
 
 <header id="top-bar" class="bar hidden">
-  <button id="btn-back" class="icon" aria-label="Back">
+  <button id="btn-back" class="icon" aria-label="Back to shelf">
     <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
   </button>
   <div id="title" class="title"></div>
@@ -40,7 +40,7 @@
 <footer id="bottom-bar" class="bar hidden">
   <div id="progress-row">
     <button id="btn-prev-ch" class="icon small" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
-    <input id="slider" type="range" min="0" max="1" step="0.0001" value="0">
+    <input id="slider" type="range" min="0" max="1" step="0.0001" value="0" aria-label="Position in book">
     <button id="btn-next-ch" class="icon small" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
   </div>
   <div id="status"><span id="status-left"></span><span id="status-right"></span></div>
@@ -49,33 +49,34 @@
 <div id="scrim" class="hidden"></div>
 
 <aside id="toc-panel" class="panel side hidden">
-  <div class="panel-head"><span>Contents</span><button class="icon close" data-close="toc-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
+  <div class="panel-head"><h2>Contents</h2><button class="icon close" data-close="toc-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
   <div id="toc-list" class="panel-body"></div>
 </aside>
 
 <aside id="search-panel" class="panel side hidden">
   <div class="panel-head">
-    <input id="search-input" type="search" placeholder="Search in book" enterkeyhint="search">
+    <input id="search-input" type="search" placeholder="Search this book" enterkeyhint="search" autocomplete="off">
     <button class="icon close" data-close="search-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
   </div>
   <div id="search-results" class="panel-body"></div>
 </aside>
 
 <section id="settings-panel" class="panel sheet hidden">
-  <div class="panel-head"><span>Display</span><button class="icon close" data-close="settings-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
+  <div class="grab"></div>
+  <div class="panel-head"><h2>Display</h2><button class="icon close" data-close="settings-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
   <div class="panel-body">
     <div class="row">
-      <span class="label">Theme</span>
+      <span class="label">Paper</span>
       <div class="chips" id="theme-chips">
-        <button class="chip theme-light" data-theme="light">Light</button>
-        <button class="chip theme-sepia" data-theme="sepia">Sepia</button>
-        <button class="chip theme-gray" data-theme="gray">Dusk</button>
-        <button class="chip theme-dark" data-theme="dark">Dark</button>
+        <button class="swatch theme-light" data-theme="light" aria-label="Light"><i></i><span>Day</span></button>
+        <button class="swatch theme-sepia" data-theme="sepia" aria-label="Sepia"><i></i><span>Sepia</span></button>
+        <button class="swatch theme-gray" data-theme="gray" aria-label="Dusk"><i></i><span>Dusk</span></button>
+        <button class="swatch theme-dark" data-theme="dark" aria-label="Night"><i></i><span>Night</span></button>
       </div>
     </div>
     <div class="row reflow-only">
       <span class="label">Text size</span>
-      <div class="stepper"><button data-step="fontSize" data-delta="-1">A−</button><span id="val-fontSize"></span><button data-step="fontSize" data-delta="1">A+</button></div>
+      <div class="stepper"><button data-step="fontSize" data-delta="-1" aria-label="Smaller">A<small>−</small></button><span id="val-fontSize"></span><button data-step="fontSize" data-delta="1" aria-label="Larger">A<small>+</small></button></div>
     </div>
     <div class="row reflow-only">
       <span class="label">Line spacing</span>
@@ -86,19 +87,19 @@
       <div class="stepper"><button data-step="margin" data-delta="-6">−</button><span id="val-margin"></span><button data-step="margin" data-delta="6">+</button></div>
     </div>
     <div class="row reflow-only">
-      <span class="label">Font</span>
+      <span class="label">Typeface</span>
       <select id="sel-font">
-        <option value="publisher">Publisher default</option>
+        <option value="publisher">Book’s own</option>
         <option value="serif">Serif</option>
-        <option value="sans-serif">Sans serif</option>
-        <option value="monospace">Monospace</option>
+        <option value="sans-serif">Sans</option>
+        <option value="monospace">Mono</option>
       </select>
     </div>
     <div class="row reflow-only">
-      <span class="label">Layout</span>
-      <div class="chips">
-        <button class="chip" data-flow="paginated">Pages</button>
-        <button class="chip" data-flow="scrolled">Scroll</button>
+      <span class="label">Turn pages by</span>
+      <div class="chips seg">
+        <button class="chip" data-flow="paginated">Flipping</button>
+        <button class="chip" data-flow="scrolled">Scrolling</button>
       </div>
     </div>
     <div class="row reflow-only">
@@ -110,10 +111,30 @@
       <div class="stepper"><button data-step="pdfZoom" data-delta="-0.25">−</button><span id="val-pdfZoom"></span><button data-step="pdfZoom" data-delta="0.25">+</button></div>
     </div>
     <div class="row">
-      <span class="label">Keep screen on</span>
+      <span class="label">Define words on long‑press</span>
+      <label class="switch"><input type="checkbox" id="chk-define"><span></span></label>
+    </div>
+    <div class="row">
+      <span class="label">Keep screen awake</span>
       <label class="switch"><input type="checkbox" id="chk-wake"><span></span></label>
     </div>
   </div>
+</section>
+
+<section id="dict-card" class="panel sheet dict hidden" aria-live="polite">
+  <div class="grab"></div>
+  <div class="dict-head">
+    <div class="dict-title">
+      <h2 id="dict-word"></h2>
+      <div id="dict-phon" class="dict-phon"></div>
+    </div>
+    <div class="dict-actions">
+      <button id="dict-speak" class="icon" aria-label="Pronounce" hidden><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
+      <button id="dict-close" class="icon" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+  </div>
+  <div id="dict-body" class="dict-body"></div>
+  <div class="dict-foot"><span id="dict-source" class="dict-src"></span><button id="dict-more" class="link" hidden>Open in Wiktionary ↗</button></div>
 </section>
 
 <script src="boot.js"></script>
