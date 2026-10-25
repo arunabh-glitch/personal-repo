@@ -22,7 +22,7 @@ self.addEventListener('fetch', e => {
             if (res.ok && res.type === 'basic') cache.put(key, res.clone())
             return res
         } catch (err) {
-            if (e.request.mode === 'navigate') return cache.match(new Request(url.origin + '/index.html')) || cache.match(key) || Response.error()
+            if (e.request.mode === 'navigate') return (await cache.match(new Request(new URL('./index.html', self.registration.scope).href))) || (await cache.match(key)) || Response.error()
             throw err
         }
     })())
