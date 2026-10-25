@@ -61,7 +61,10 @@ export const library = {
     async all() { return tx('books', 'readonly', t => req(t.objectStore('books').getAll())) },
     async get(id) { return tx('books', 'readonly', t => req(t.objectStore('books').get(id))) },
     async put(book) { return tx('books', 'readwrite', t => req(t.objectStore('books').put(book))) },
-    async getFile(id) { return tx('files', 'readonly', t => req(t.objectStore('files').get(id))) },
+    async getFile(id) {
+        const v = await tx('files', 'readonly', t => req(t.objectStore('files').get(id)))
+        return toBlob(v)
+    },
     async remove(id) {
         return tx(['books', 'files'], 'readwrite', t => { t.objectStore('books').delete(id); t.objectStore('files').delete(id) })
     },
@@ -84,9 +87,10 @@ export const library = {
             id, title, author: '', format, fileName: file.name, size: file.size, addedAt: Date.now(), lastOpenedAt: 0,
             progress: 0, location: null, progressLabel: null, cover: null, metadataFetched: false, sourceUrl,
         }
-        // Store a plain Blob (Safari is happier persisting Blobs than File objects).
-        const blob = file.slice(0, file.size, file.type || FORMATS[format])
-        await tx(['books', 'files'], 'readwrite', t => { t.objectStore('files').put(blob, id); t.objectStore('books').put(book) })
+        // Store raw bytes: Safari can return unusable Blobs from IndexedDB after the storing page is gone.
+        const buf = await file.arrayBuffer()
+        const record = { type: file.type || FORMATS[format], buf }
+        await tx(['books', 'files'], 'readwrite', t => { t.objectStore('files').put(record, id); t.objectStore('books').put(book) })
         return book
     },
     async usage() {
@@ -95,4 +99,16 @@ export const library = {
     async persist() { try { return await navigator.storage?.persist?.() } catch { return false } },
 }
 
-export const dataUrlToBlob = async dataUrl => (await fetch(dataUrl)).blob()
+/** Accepts a Blob, a { type, buf } record, or null and returns a Blob (or null). */
+export const toBlob = v => {
+    if (!v) return null
+    if (v instanceof Blob) return v.size ? v : null
+    if (v.buf) return new Blob([v.buf], { type: v.type || 'application/octet-stream' })
+    return null
+}
+
+/** Converts a data: URL into a { type, buf } record safe to persist in IndexedDB. */
+export const dataUrlToRecord = async dataUrl => {
+    const res = await fetch(dataUrl)
+    return { type: res.headers.get('content-type') || 'image/jpeg', buf: await res.arrayBuffer() }
+}

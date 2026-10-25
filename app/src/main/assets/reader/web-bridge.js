@@ -1,6 +1,6 @@
 // Host bridge for the web build (iPhone home-screen app / any browser).
 // Mirrors the Android `window.Android` interface on top of IndexedDB.
-import { library, dataUrlToBlob } from './store.js'
+import { library, dataUrlToRecord } from './store.js'
 
 const SETTINGS_KEY = 'openshelf.reader.settings'
 
@@ -8,7 +8,7 @@ export const createWebBridge = async id => {
     const book = await library.get(id)
     if (!book) throw new Error('This book is no longer in the library.')
     const file = await library.getFile(id)
-    if (!file) throw new Error('The book file is missing from storage.')
+    if (!file) throw new Error('The book file is missing from storage. Remove it from the shelf and add it again.')
     const url = URL.createObjectURL(file)
     let wakeLock = null
     await library.update(id, { lastOpenedAt: Date.now() })
@@ -29,7 +29,7 @@ export const createWebBridge = async id => {
             const patch = { metadataFetched: true }
             if (m.title) patch.title = m.title
             if (m.author) patch.author = m.author
-            if (m.cover) { try { patch.cover = await dataUrlToBlob(m.cover) } catch (e) { console.warn(e) } }
+            if (m.cover) { try { patch.cover = await dataUrlToRecord(m.cover) } catch (e) { console.warn(e) } }
             library.update(id, patch).catch(console.error)
         },
         onReady: () => {},

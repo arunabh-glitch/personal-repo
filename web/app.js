@@ -1,4 +1,4 @@
-import { library, ACCEPT, formatLabel, detectFormat } from './reader/store.js'
+import { library, ACCEPT, formatLabel, detectFormat, toBlob } from './reader/store.js'
 
 const $ = s => document.querySelector(s)
 const grid = $('#grid'), empty = $('#empty'), fileInput = $('#file-input')
@@ -12,10 +12,13 @@ const busy = on => { let el = $('.progress-line'); if (on && !el) { el = documen
 const fmtSize = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const coverUrl = book => {
-    if (!book.cover) return null
-    if (!urls.has(book.id)) urls.set(book.id, URL.createObjectURL(book.cover))
+    const blob = toBlob(book.cover)
+    if (!blob) return null
+    if (!urls.has(book.id)) urls.set(book.id, URL.createObjectURL(blob))
     return urls.get(book.id)
 }
+// A cover that fails to load is discarded so the reader regenerates it on the next open.
+const healCover = book => library.update(book.id, { cover: null, metadataFetched: false }).catch(() => {})
 const pctOf = b => Math.round((b.progress || 0) * 100)
 const badgeFor = b => { const p = pctOf(b); return p >= 100 ? 'done ✓' : p > 0 ? p + '%' : b.progress > 0 ? 'just started' : formatLabel(b.format) }
 
@@ -38,7 +41,7 @@ const render = () => {
         $('#cc-img').hidden = !url; if (url) $('#cc-img').src = url
         $('#cc-ph').hidden = !!url
         $('#cc-ph').textContent = current.title
-        $('#cc-img').onerror = () => { $('#cc-img').hidden = true; $('#cc-ph').hidden = false }
+        $('#cc-img').onerror = () => { $('#cc-img').hidden = true; $('#cc-ph').hidden = false; healCover(current) }
         $('#cc-title').textContent = current.title
         $('#cc-author').textContent = current.author || formatLabel(current.format)
         $('#cc-where').textContent = current.progressLabel ? `${current.progressLabel} · ${pctOf(current)}%` : (current.progress > 0 ? `${pctOf(current)}% in` : 'just started')
@@ -59,6 +62,7 @@ const render = () => {
             <div class="t">${esc(b.title)}</div><div class="a">${esc(b.author || formatLabel(b.format))}</div>`
         card.querySelector('img')?.addEventListener('error', e => {
             e.target.outerHTML = `<div class="ph"><span>${esc(b.title)}</span>${b.author ? `<small>${esc(b.author)}</small>` : ''}</div>`
+            healCover(b)
         })
         card.addEventListener('click', () => open(b))
         let timer
