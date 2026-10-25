@@ -1,0 +1,10 @@
+<resources>
+    <color name="primary">#D7B79E</color>
+    <color name="on_primary">#2E2119</color>
+    <color name="primary_container">#4A3A2E</color>
+    <color name="surface">#15110E</color>
+    <color name="surface_variant">#2A2320</color>
+    <color name="on_surface">#EDE4DB</color>
+    <color name="outline">#9B8B7D</color>
+    <color name="reader_background">#000000</color>
+</resources>

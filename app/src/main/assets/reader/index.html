@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' blob: 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; connect-src 'self' blob: data:; frame-src blob: data:; object-src blob: data:; worker-src 'self' blob:; form-action 'none';">
+<title>OpenShelf Reader</title>
+<link rel="stylesheet" href="reader.css">
+</head>
+<body data-theme="light">
+<div id="book"></div>
+<div id="pdf" hidden><div id="pdf-pages"></div></div>
+
+<div id="tap-hint" hidden></div>
+
+<div id="loading"><div class="spinner"></div><div id="loading-text">Opening…</div></div>
+<div id="error" hidden>
+  <h2>Can’t open this book</h2>
+  <p id="error-text"></p>
+  <button id="error-back" class="btn">Back to library</button>
+</div>
+
+<header id="top-bar" class="bar hidden">
+  <button id="btn-back" class="icon" aria-label="Back">
+    <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+  </button>
+  <div id="title" class="title"></div>
+  <button id="btn-search" class="icon" aria-label="Search">
+    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+  </button>
+  <button id="btn-toc" class="icon" aria-label="Contents">
+    <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+  </button>
+  <button id="btn-settings" class="icon" aria-label="Display settings">
+    <svg viewBox="0 0 24 24"><path d="M9 4v3h5v12h3V7h5V4H9zm-6 8h3v7h3v-7h3V9H3v3z"/></svg>
+  </button>
+</header>
+
+<footer id="bottom-bar" class="bar hidden">
+  <div id="progress-row">
+    <button id="btn-prev-ch" class="icon small" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
+    <input id="slider" type="range" min="0" max="1" step="0.0001" value="0">
+    <button id="btn-next-ch" class="icon small" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
+  </div>
+  <div id="status"><span id="status-left"></span><span id="status-right"></span></div>
+</footer>
+
+<div id="scrim" class="hidden"></div>
+
+<aside id="toc-panel" class="panel side hidden">
+  <div class="panel-head"><span>Contents</span><button class="icon close" data-close="toc-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
+  <div id="toc-list" class="panel-body"></div>
+</aside>
+
+<aside id="search-panel" class="panel side hidden">
+  <div class="panel-head">
+    <input id="search-input" type="search" placeholder="Search in book" enterkeyhint="search">
+    <button class="icon close" data-close="search-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+  </div>
+  <div id="search-results" class="panel-body"></div>
+</aside>
+
+<section id="settings-panel" class="panel sheet hidden">
+  <div class="panel-head"><span>Display</span><button class="icon close" data-close="settings-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
+  <div class="panel-body">
+    <div class="row">
+      <span class="label">Theme</span>
+      <div class="chips" id="theme-chips">
+        <button class="chip theme-light" data-theme="light">Light</button>
+        <button class="chip theme-sepia" data-theme="sepia">Sepia</button>
+        <button class="chip theme-gray" data-theme="gray">Dusk</button>
+        <button class="chip theme-dark" data-theme="dark">Dark</button>
+      </div>
+    </div>
+    <div class="row reflow-only">
+      <span class="label">Text size</span>
+      <div class="stepper"><button data-step="fontSize" data-delta="-1">A−</button><span id="val-fontSize"></span><button data-step="fontSize" data-delta="1">A+</button></div>
+    </div>
+    <div class="row reflow-only">
+      <span class="label">Line spacing</span>
+      <div class="stepper"><button data-step="lineHeight" data-delta="-0.1">−</button><span id="val-lineHeight"></span><button data-step="lineHeight" data-delta="0.1">+</button></div>
+    </div>
+    <div class="row reflow-only">
+      <span class="label">Margins</span>
+      <div class="stepper"><button data-step="margin" data-delta="-6">−</button><span id="val-margin"></span><button data-step="margin" data-delta="6">+</button></div>
+    </div>
+    <div class="row reflow-only">
+      <span class="label">Font</span>
+      <select id="sel-font">
+        <option value="publisher">Publisher default</option>
+        <option value="serif">Serif</option>
+        <option value="sans-serif">Sans serif</option>
+        <option value="monospace">Monospace</option>
+      </select>
+    </div>
+    <div class="row reflow-only">
+      <span class="label">Layout</span>
+      <div class="chips">
+        <button class="chip" data-flow="paginated">Pages</button>
+        <button class="chip" data-flow="scrolled">Scroll</button>
+      </div>
+    </div>
+    <div class="row reflow-only">
+      <span class="label">Justify text</span>
+      <label class="switch"><input type="checkbox" id="chk-justify"><span></span></label>
+    </div>
+    <div class="row pdf-only">
+      <span class="label">Zoom</span>
+      <div class="stepper"><button data-step="pdfZoom" data-delta="-0.25">−</button><span id="val-pdfZoom"></span><button data-step="pdfZoom" data-delta="0.25">+</button></div>
+    </div>
+    <div class="row">
+      <span class="label">Keep screen on</span>
+      <label class="switch"><input type="checkbox" id="chk-wake"><span></span></label>
+    </div>
+  </div>
+</section>
+
+<script type="module" src="reader.js"></script>
+</body>
+</html>

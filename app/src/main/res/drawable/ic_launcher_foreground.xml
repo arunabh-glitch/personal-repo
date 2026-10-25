@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Open book glyph -->
+    <path android:fillColor="#FBF7F2"
+        android:pathData="M30,34 C38,30 46,31 53,36 L53,78 C46,73 38,72 30,76 Z" />
+    <path android:fillColor="#E8D9CC"
+        android:pathData="M78,34 C70,30 62,31 55,36 L55,78 C62,73 70,72 78,76 Z" />
+    <path android:fillColor="#C96A2B"
+        android:pathData="M53,36 L55,36 L55,78 L53,78 Z" />
+    <path android:fillColor="#5B4636" android:fillAlpha="0.35"
+        android:pathData="M35,43 L48,41 L48,44 L35,46 Z M35,50 L48,48 L48,51 L35,53 Z M35,57 L48,55 L48,58 L35,60 Z M60,41 L73,43 L73,46 L60,44 Z M60,48 L73,50 L73,53 L60,51 Z M60,55 L73,57 L73,60 L60,58 Z" />
+</vector>
