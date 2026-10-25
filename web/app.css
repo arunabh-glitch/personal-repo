@@ -41,3 +41,4 @@ main { padding: 12px 12px calc(100px + var(--sab)); max-width: 1100px; margin: 0
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(90px + var(--sab)); background: #222; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 20; max-width: 90vw; text-align: center; }
 .progress-line { position: fixed; top: 0; left: 0; height: 3px; background: var(--accent); z-index: 30; animation: load 1.2s ease-in-out infinite; }
 @keyframes load { 0% { width: 0; left: 0 } 50% { width: 60%; left: 20% } 100% { width: 0; left: 100% } }
+
