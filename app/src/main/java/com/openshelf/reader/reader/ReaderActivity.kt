@@ -23,6 +23,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewCompat
 import com.openshelf.reader.OpenShelfApp
 import com.openshelf.reader.R
 import com.openshelf.reader.data.Book
@@ -38,6 +39,11 @@ class ReaderActivity : AppCompatActivity(), ReaderBridge.Host {
     private var insetTop = 0
     private var insetBottom = 0
     private var pageReady = false
+    private var readerReady = false
+    private val lastConsoleErrors = ArrayDeque<String>()
+    private val watchdog = Runnable {
+        if (!readerReady && !isFinishing) onReaderError(getString(R.string.reader_timeout, webViewVersion()))
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -97,7 +103,11 @@ class ReaderActivity : AppCompatActivity(), ReaderBridge.Host {
         }
         web.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(m: ConsoleMessage): Boolean {
-                Log.d(TAG, "[js] ${m.message()} (${m.sourceId()}:${m.lineNumber()})")
+                val line = "${m.message()} (${m.sourceId().substringAfterLast('/')}:${m.lineNumber()})"
+                if (m.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                    Log.e(TAG, "[js] $line")
+                    synchronized(lastConsoleErrors) { lastConsoleErrors.addLast(line); while (lastConsoleErrors.size > 5) lastConsoleErrors.removeFirst() }
+                } else Log.d(TAG, "[js] $line")
                 return true
             }
         }
@@ -115,7 +125,12 @@ class ReaderActivity : AppCompatActivity(), ReaderBridge.Host {
             }
         })
         web.loadUrl("https://${WebViewAssetLoader.DEFAULT_DOMAIN}/assets/reader/index.html")
+        web.postDelayed(watchdog, WATCHDOG_MS)
     }
+
+    private fun webViewVersion(): String =
+        runCatching { WebViewCompat.getCurrentWebViewPackage(this)?.versionName }.getOrNull() ?: "unknown"
+
 
     private fun pushInsets() {
         if (!pageReady) return
@@ -133,6 +148,7 @@ class ReaderActivity : AppCompatActivity(), ReaderBridge.Host {
     }
 
     override fun onDestroy() {
+        binding.webview.removeCallbacks(watchdog)
         binding.webview.apply { loadUrl("about:blank"); stopLoading(); destroy() }
         super.onDestroy()
     }
@@ -166,11 +182,26 @@ class ReaderActivity : AppCompatActivity(), ReaderBridge.Host {
         repo.updateMetadata(book.id, title, author, coverDataUrl)
     }
 
-    override fun onReaderReady() = runOnUiThread { binding.loading.visibility = View.GONE }
+    override fun onReaderReady() = runOnUiThread {
+        readerReady = true
+        binding.webview.removeCallbacks(watchdog)
+        binding.loading.visibility = View.GONE
+    }
 
     override fun onReaderError(message: String) = runOnUiThread {
+        readerReady = true
+        binding.webview.removeCallbacks(watchdog)
         binding.loading.visibility = View.GONE
-        Toast.makeText(this, getString(R.string.reader_error, message), Toast.LENGTH_LONG).show()
+        val extra = synchronized(lastConsoleErrors) { lastConsoleErrors.joinToString("\n") }
+        val full = if (extra.isNotBlank() && !message.contains(extra.lineSequence().first())) "$message\n$extra" else message
+        Log.e(TAG, "reader error: $full (WebView ${webViewVersion()})")
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.reader_error_title)
+            .setMessage(getString(R.string.reader_error, full) + "\n\nWebView ${webViewVersion()}")
+            .setPositiveButton(R.string.ok) { _, _ -> finish() }
+            .setNeutralButton(R.string.retry) { _, _ -> recreate() }
+            .setOnCancelListener { finish() }
+            .show()
     }
 
     override fun onClose() = runOnUiThread { finish() }
@@ -193,6 +224,7 @@ class ReaderActivity : AppCompatActivity(), ReaderBridge.Host {
         private const val TAG = "ReaderActivity"
         const val EXTRA_BOOK_ID = "book_id"
         private const val KEY_SETTINGS = "settings"
+        private const val WATCHDOG_MS = 30_000L
 
         fun start(context: Context, bookId: String) {
             context.startActivity(Intent(context, ReaderActivity::class.java).putExtra(EXTRA_BOOK_ID, bookId))
