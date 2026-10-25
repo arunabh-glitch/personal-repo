@@ -12,6 +12,7 @@
   :root { --bg: #17131f; --ink: #f4efff; --muted: #a79fbd; --card: #231c33; --hair: rgba(255,255,255,0.1); --lilac-soft: #2d2344; --shadow: 4px 4px 0 #000; }
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--ui); min-height: 100%; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 body { padding-top: var(--sat); overscroll-behavior-y: none; position: relative; overflow-x: hidden; }
 button { font: inherit; color: inherit; cursor: pointer; }
