@@ -1,17 +1,20 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Dogear mascot: a page with a folded corner and a face -->
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M31,30 C31,27.2 33.2,25 36,25 L62,25 L78,41 L78,78 C78,80.8 75.8,83 73,83 L36,83 C33.2,83 31,80.8 31,78 Z" />
-    <path android:fillColor="#1E1636" android:fillAlpha="0.9"
-        android:pathData="M36,22.5 C31.9,22.5 28.5,25.9 28.5,30 L28.5,78 C28.5,82.1 31.9,85.5 36,85.5 L73,85.5 C77.1,85.5 80.5,82.1 80.5,78 L80.5,40 L63,22.5 Z M36,27.5 L61,27.5 L75.5,42 L75.5,78 C75.5,79.4 74.4,80.5 73,80.5 L36,80.5 C34.6,80.5 33.5,79.4 33.5,78 L33.5,30 C33.5,28.6 34.6,27.5 36,27.5 Z" />
-    <path android:fillColor="#FF5CA8"
-        android:pathData="M62,25 L62,37 C62,39.2 63.8,41 66,41 L78,41 Z" />
-    <path android:fillColor="#1E1636"
-        android:pathData="M45.5,54 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0 Z M62.5,54 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0 Z" />
-    <path android:fillColor="#1E1636"
-        android:pathData="M46,63 C48,66.5 51,68 54,68 C57,68 60,66.5 62,63 L59.6,61.6 C58.2,64 56.3,65 54,65 C51.7,65 49.8,64 48.4,61.6 Z" />
-    <path android:fillColor="#FF5CA8" android:fillAlpha="0.6"
-        android:pathData="M40,61 m-2.4,0 a2.4,2.4 0 1,0 4.8,0 a2.4,2.4 0 1,0 -4.8,0 Z M68,61 m-2.4,0 a2.4,2.4 0 1,0 4.8,0 a2.4,2.4 0 1,0 -4.8,0 Z" />
+    <group android:scaleX="1.5" android:scaleY="1.5" android:translateX="6" android:translateY="6">
+        <path android:fillColor="#FFFFFF" android:strokeColor="#1E1636" android:strokeWidth="2.5" android:strokeLineJoin="round"
+            android:pathData="M16,8 L38,8 L48,18 L48,52 A4,4 0 0 1 44,56 L16,56 A4,4 0 0 1 12,52 L12,12 A4,4 0 0 1 16,8 Z" />
+        <path android:fillColor="#1E1636" android:fillAlpha="0.18"
+            android:pathData="M37,9.5 L37,16.5 A3,3 0 0 0 40,19.5 L47,19.5 Z" />
+        <path android:fillColor="#FF5CA8" android:strokeColor="#1E1636" android:strokeWidth="2.5" android:strokeLineJoin="round"
+            android:pathData="M38,8 L38,15 A3,3 0 0 0 41,18 L48,18 Z" />
+        <path android:fillColor="#1E1636"
+            android:pathData="M25,29.1 A2.5,2.9 0 1 0 25,34.9 A2.5,2.9 0 1 0 25,29.1 Z M36,29.1 A2.5,2.9 0 1 0 36,34.9 A2.5,2.9 0 1 0 36,29.1 Z" />
+        <path android:fillColor="#FFFFFF"
+            android:pathData="M25.9,30.1 A0.9,0.9 0 1 0 25.9,31.9 A0.9,0.9 0 1 0 25.9,30.1 Z M36.9,30.1 A0.9,0.9 0 1 0 36.9,31.9 A0.9,0.9 0 1 0 36.9,30.1 Z" />
+        <path android:strokeColor="#1E1636" android:strokeWidth="2.5" android:strokeLineCap="round" android:fillColor="#00000000"
+            android:pathData="M25,40.5 Q30.5,46 36,40.5" />
+        <path android:fillColor="#FF5CA8" android:fillAlpha="0.55"
+            android:pathData="M20.2,36.1 A2.4,1.5 0 1 0 20.2,39.1 A2.4,1.5 0 1 0 20.2,36.1 Z M40.8,36.1 A2.4,1.5 0 1 0 40.8,39.1 A2.4,1.5 0 1 0 40.8,36.1 Z" />
+    </group>
 </vector>
