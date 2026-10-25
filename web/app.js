@@ -74,7 +74,7 @@ const render = () => {
         grid.append(card)
     }
     empty.hidden = list.length > 0
-    library.usage().then(u => { $('#storage').textContent = u && u.quota ? `${fmtSize(u.used)} of books · ${fmtSize(u.quota - u.used)} free` : '' })
+    library.usage().then(u => { $('#storage').textContent = list.length && u && u.quota ? `${fmtSize(u.used)} of books · ${fmtSize(u.quota - u.used)} free` : '' })
 }
 
 const open = book => { location.href = `reader/index.html?id=${encodeURIComponent(book.id)}` }
