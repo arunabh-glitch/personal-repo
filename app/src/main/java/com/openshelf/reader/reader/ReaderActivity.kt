@@ -42,7 +42,10 @@ class ReaderActivity : AppCompatActivity(), ReaderBridge.Host {
     private var readerReady = false
     private val lastConsoleErrors = ArrayDeque<String>()
     private val watchdog = Runnable {
-        if (!readerReady && !isFinishing) onReaderError(getString(R.string.reader_timeout, webViewVersion()))
+        if (readerReady || isFinishing) return@Runnable
+        binding.webview.evaluateJavascript("String(window.__phase || 'script not started')") { phase ->
+            if (!readerReady) onReaderError(getString(R.string.reader_timeout, phase.trim('"'), webViewVersion()))
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")

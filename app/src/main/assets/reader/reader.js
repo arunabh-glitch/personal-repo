@@ -56,6 +56,7 @@ const formatContributor = c => {
 }
 const formatTitle = t => !t ? '' : typeof t === 'string' ? t : Object.values(t)[0] ?? ''
 const percent = new Intl.NumberFormat('en', { style: 'percent' })
+const phase = p => { globalThis.__phase = p; console.log('phase: ' + p) }
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms) } }
 
 const blobToDataURL = async (blob, maxH = 600) => {
@@ -83,8 +84,10 @@ class Reader {
         $('#title').textContent = this.info.title || ''
         this.#bindChrome()
         const fmt = (this.info.format || '').toLowerCase()
+        phase('fetching file')
         if (fmt === 'pdf') await this.#openPdf()
         else await this.#openBook(fmt)
+        phase('ready')
         $('#loading').hidden = true
         bridge.onReady()
         bridge.keepScreenOn(this.settings.keepScreenOn)
@@ -102,6 +105,7 @@ class Reader {
         const res = await fetch(this.info.url)
         if (!res.ok) throw new Error(`Could not read file (${res.status})`)
         const blob = await res.blob()
+        phase(`parsing book (${Math.round(blob.size / 1024)} KB)`)
         const file = new File([blob], this.info.fileName || 'book', { type: blob.type })
         const book = isTextFormat(fmt) ? await makeTextBook(blob, this.info.fileName || 'book.txt', fmt) : file
 
@@ -124,6 +128,7 @@ class Reader {
         $('#title').textContent = title
         this.#applyRendererSettings()
         this.#buildToc(this.book.toc ?? [])
+        phase('rendering first page')
         await view.init({ lastLocation: this.info.location || undefined })
         if (this.info.needsMetadata) this.#sendMetadata(title).catch(console.error)
     }
@@ -247,7 +252,9 @@ class Reader {
         $('#book').hidden = true
         this.pdf = new PdfViewer($('#pdf'), $('#pdf-pages'))
         this.#applyPdfTheme()
+        phase('parsing PDF')
         await this.pdf.open(this.info.url)
+        phase('rendering first page')
         this.pdf.addEventListener('relocate', e => {
             const { page, total, fraction } = e.detail
             this.lastFraction = fraction
