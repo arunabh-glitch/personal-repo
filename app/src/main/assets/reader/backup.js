@@ -1,6 +1,6 @@
-// Backup & restore: one .zip with the shelf index, every book file, covers, highlights and sessions.
+// Backup & restore: one .zip with the shelf index, every book file, covers, highlights, sessions and saved words.
 // Used to move a shelf between devices (via Files / iCloud Drive / any file transfer).
-import { library, highlights, sessions, toBlob } from './store.js'
+import { library, highlights, sessions, vocab, toBlob } from './store.js'
 
 const SETTINGS_KEYS = ['dogear.reader.settings', 'dogear.sort', 'dogear.dict.v1']
 
@@ -13,6 +13,7 @@ export const createBackup = async (onProgress = () => {}) => {
         books: books.map(b => ({ ...b, cover: undefined, coverFile: b.cover ? `covers/${b.id}.jpg` : null, file: `books/${b.id}` })),
         highlights: await highlights.all(),
         sessions: await sessions.all(),
+        vocab: await vocab.all(),
         settings: Object.fromEntries(SETTINGS_KEYS.map(k => [k, localStorage.getItem(k)]).filter(([, v]) => v != null)),
     }
     await writer.add('dogear.json', JSON.stringify(manifest))
@@ -65,6 +66,8 @@ export const restoreBackup = async (blob, onProgress = () => {}) => {
     for (const h of manifest.highlights || []) if (!haveH.has(h.id)) await highlights.put(h)
     const haveS = new Set((await sessions.all()).map(s => s.id))
     for (const s of manifest.sessions || []) if (!haveS.has(s.id)) await sessions.put(s)
+    const haveW = new Set((await vocab.all()).map(w => w.id))
+    for (const w of manifest.vocab || []) if (!haveW.has(w.id)) await vocab.put(w)
     for (const [k, v] of Object.entries(manifest.settings || {})) if (localStorage.getItem(k) == null) localStorage.setItem(k, v)
     await reader.close()
     return { added, updated, highlights: (manifest.highlights || []).length }

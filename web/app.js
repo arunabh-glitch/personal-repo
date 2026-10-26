@@ -1,10 +1,12 @@
-import { library, sessions, highlights, computeStats, ACCEPT, formatLabel, detectFormat, toBlob } from './reader/store.js'
+import { library, sessions, highlights, vocab, computeStats, bookTime, ACCEPT, formatLabel, detectFormat, toBlob } from './reader/store.js'
 
 const $ = s => document.querySelector(s)
 const $$ = s => Array.from(document.querySelectorAll(s))
 const grid = $('#grid'), empty = $('#empty'), fileInput = $('#file-input')
 const SORT_KEY = 'dogear.sort'
 let books = []
+let allSessions = []
+let words = []
 let sheetBook = null
 let activeTag = null
 let query = ''
@@ -24,6 +26,10 @@ const coverUrl = book => {
 // A cover that fails to load is discarded so the reader regenerates it on the next open.
 const healCover = book => library.update(book.id, { cover: null, metadataFetched: false }).catch(() => {})
 const pctOf = b => Math.round((b.progress || 0) * 100)
+const fmtMin = secs => { const m = Math.round(secs / 60); return m >= 60 ? (m % 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${Math.floor(m / 60)}h`) : `${m}m` }
+const fmtLeft = secs => { const m = Math.round(secs / 60); if (m < 1) return 'a minute'; if (m < 60) return `${m} min`; const h = Math.floor(m / 60), r = m % 60; return r ? `${h}h ${r}m` : `${h}h` }
+const timeFor = b => bookTime(allSessions.filter(s => s.bookId === b.id), b.progress || 0)
+const timeLine = b => { const t = timeFor(b); return t.seconds < 60 ? '' : `${fmtMin(t.seconds)} read` + (t.remaining != null && !isFinished(b) ? ` · ~${fmtLeft(t.remaining)} left` : '') }
 const badgeFor = b => { const p = pctOf(b); return p >= 100 ? 'done' : p > 0 ? p + '%' : b.progress > 0 ? 'just started' : formatLabel(b.format) }
 
 
@@ -51,6 +57,7 @@ const render = () => {
         $('#cc-title').textContent = current.title
         $('#cc-author').textContent = current.author || formatLabel(current.format)
         $('#cc-where').textContent = current.progressLabel ? `${current.progressLabel} · ${pctOf(current)}%` : (current.progress > 0 ? `${pctOf(current)}% in` : 'just started')
+        const tl = timeLine(current); $('#cc-time').hidden = !tl; $('#cc-time').textContent = tl
         $('#cc-bar').style.width = Math.max(1, pctOf(current)) + '%'
         $('#continue-card').onclick = () => open(current)
     }
@@ -75,17 +82,26 @@ const render = () => {
     library.usage().then(u => { $('#storage').textContent = books.length && u && u.quota ? `${fmtSize(u.used)} of books · ${fmtSize(u.quota - u.used)} free` : '' })
 }
 
-const fmtMin = secs => { const m = Math.round(secs / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m` }
-const renderStats = async () => {
-    const list = await sessions.all().catch(() => [])
-    const st = computeStats(list)
+const renderStats = () => {
+    const st = computeStats(allSessions)
     const finished = books.filter(isFinished).length
-    const show = books.length > 0 && (st.sessions > 0 || finished > 0)
+    const show = books.length > 0 && (st.sessions > 0 || finished > 0 || words.length > 0)
     $('#stats').hidden = !show
     if (!show) return
     $('#st-today').textContent = fmtMin(st.todaySeconds)
     $('#st-week').textContent = fmtMin(st.weekSeconds)
+    $('#st-total').textContent = fmtMin(st.totalSeconds)
+    $('#st-words-n').textContent = String(words.length)
+    $('#st-words').querySelector('span').textContent = words.length === 1 ? 'word saved' : 'words saved'
+    // streak card
     $('#st-streak').textContent = String(st.streak)
+    $('#st-streak-label').textContent = st.streak === 1 ? 'day streak' : 'day streak'
+    const best = $('#st-best'); best.hidden = !(st.bestStreak >= 2 && st.bestStreak > st.streak); best.textContent = `best ${st.bestStreak}`
+    const flame = $('.flame'); flame.classList.toggle('lit', st.todayDone); flame.classList.toggle('cold', !st.todayDone && st.streak === 0)
+    $('#st-days').innerHTML = st.days.map(d => `<span class="day${d.read ? ' read' : ''}${d.today ? ' today' : ''}" title="${fmtMin(d.seconds)}"><i></i><b>${'SMTWTFS'[new Date(d.ts).getDay()]}</b></span>`).join('')
+    $('#st-nudge').textContent = st.todayDone
+        ? (st.streak >= 2 ? `${st.streak} days in a row. keep it rolling.` : 'today’s reading is in. nice.')
+        : st.streak > 0 ? 'two minutes today keeps the streak alive.' : 'read for two minutes today to start a streak.'
     const stickers = []
     if (st.streak >= 30) stickers.push(['pink', '30-day streak'])
     else if (st.streak >= 7) stickers.push(['pink', 'week streak'])
@@ -96,6 +112,8 @@ const renderStats = async () => {
     else if (finished >= 1) stickers.push(['blue', finished === 1 ? 'first finish' : `${finished} finished`])
     if (st.totalSeconds >= 36000) stickers.push(['lilac', '10 hours read'])
     if (st.pagesToday >= 50) stickers.push(['lilac', `${st.pagesToday} pages today`])
+    if (words.length >= 50) stickers.push(['sun', `${words.length} words`])
+    else if (words.length >= 10) stickers.push(['sun', 'word collector'])
     $('#st-stickers').innerHTML = stickers.map(([c, t]) => `<span class="${c}">${t}</span>`).join('')
 }
 
@@ -128,7 +146,8 @@ const open = book => { location.href = `reader/index.html?id=${encodeURIComponen
 const showSheet = book => {
     sheetBook = book
     $('#sheet-title').textContent = book.title
-    $('#sheet-sub').textContent = [book.author, formatLabel(book.format), fmtSize(book.size), book.progressLabel].filter(Boolean).join(' · ')
+    const tb = timeFor(book)
+    $('#sheet-sub').textContent = [book.author, formatLabel(book.format), fmtSize(book.size), book.progressLabel, tb.seconds >= 60 ? `${fmtMin(tb.seconds)} read` : null].filter(Boolean).join(' · ')
     $('#sheet [data-act="finished"]').textContent = isFinished(book) ? 'move back to the shelf' : 'mark as finished'
     $('#sheet').hidden = false; $('#sheet-scrim').hidden = false
     if (navigator.vibrate) navigator.vibrate(10)
@@ -145,14 +164,14 @@ $('#sheet').addEventListener('click', async e => {
         if (v !== null) { const tags = [...new Set(v.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))]; await library.update(b.id, { tags }); await reload(); toast(tags.length ? 'tagged ✓' : 'tags cleared') }
     }
     else if (act === 'finished') { await library.update(b.id, isFinished(b) ? { finishedAt: null, progress: Math.min(b.progress || 0, 0.97) } : { finishedAt: Date.now() }); await reload(); toast(isFinished(b) ? 'back on the shelf' : 'finished!') }
-    else if (act === 'details') alert(`${b.title}\n${b.author || 'Unknown author'}\n${formatLabel(b.format)} · ${fmtSize(b.size)}\n${b.progressLabel || 'Not started'} (${pctOf(b)}%)\nAdded ${new Date(b.addedAt).toLocaleString()}${b.sourceUrl ? '\n' + b.sourceUrl : ''}`)
+    else if (act === 'details') alert(`${b.title}\n${b.author || 'Unknown author'}\n${formatLabel(b.format)} · ${fmtSize(b.size)}\n${b.progressLabel || 'Not started'} (${pctOf(b)}%)\n${timeLine(b) || 'No reading time yet'}\nAdded ${new Date(b.addedAt).toLocaleString()}${b.sourceUrl ? '\n' + b.sourceUrl : ''}`)
     else if (act === 'delete') {
         if (confirm(`remove “${b.title}” from your shelf?`)) { await library.remove(b.id); urls.delete(b.id); await reload(); toast('gone') }
     }
     hideSheet()
 })
 
-const reload = async () => { books = await library.all(); render() }
+const reload = async () => { books = await library.all(); allSessions = await sessions.all().catch(() => []); words = await vocab.all().catch(() => []); render() }
 
 const importFiles = async files => {
     if (!files.length) return
@@ -184,8 +203,77 @@ $('#more').addEventListener('click', e => {
     else if (act === 'url') addFromUrl()
     else if (act === 'backup') backup()
     else if (act === 'restore') $('#restore-input').click()
+    else if (act === 'words') openWords()
     else if (act === 'help') { $('#help').hidden = false }
 })
+
+// ---- my words (vocabulary) ----
+const escRe = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const markWord = (ctx, word) => { const re = new RegExp(`(${escRe(word)}\\w*)`, 'i'); return esc(ctx).replace(re, '<mark>$1</mark>') }
+const openWords = async () => {
+    words = await vocab.all().catch(() => [])
+    renderWords()
+    $('#quiz').hidden = true; $('#words-list').hidden = false
+    $('#words').hidden = false
+}
+const renderWords = () => {
+    const list = [...words].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    $('#words-count').textContent = list.length ? `${list.length} ${list.length === 1 ? 'word' : 'words'}, newest first` : ''
+    $('#words-empty').hidden = list.length > 0
+    $('#quiz-start').hidden = list.length < 1
+    $('#words-list').innerHTML = list.map(w => `<article class="word-card" data-id="${esc(w.id)}">
+        <div class="wc-head"><h3 class="wc-word">${esc(w.word)}</h3>${w.phonetic ? `<span class="wc-phon">${esc(w.phonetic)}</span>` : ''}<span class="spacer"></span>
+            <button class="icon-sm" data-wact="speak" aria-label="Pronounce"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
+            <button class="icon-sm" data-wact="remove" aria-label="Remove"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
+        ${w.pos ? `<span class="wc-pos">${esc(w.pos)}</span>` : ''}
+        <p class="wc-def">${esc(w.def || '')}</p>
+        ${w.context && w.context.toLowerCase() !== w.word ? `<blockquote class="wc-ctx">“${markWord(w.context, w.word)}”${w.bookTitle ? `<cite>${esc(w.bookTitle)}</cite>` : ''}</blockquote>` : w.bookTitle ? `<p class="wc-from">from <cite>${esc(w.bookTitle)}</cite></p>` : ''}
+    </article>`).join('')
+}
+$('#words-list').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-wact]'); if (!btn) return
+    const id = btn.closest('.word-card').dataset.id, w = words.find(x => x.id === id)
+    if (!w) return
+    if (btn.dataset.wact === 'speak' && 'speechSynthesis' in window) { speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance(w.word)) }
+    if (btn.dataset.wact === 'remove') { await vocab.remove(id); words = words.filter(x => x.id !== id); renderWords(); renderStats(); toast('removed') }
+})
+$('#words-close').addEventListener('click', () => { $('#words').hidden = true; renderStats() })
+$('#st-words').addEventListener('click', () => openWords())
+
+// flashcards
+let quiz = null
+const startQuiz = () => {
+    const pool = [...words].sort(() => Math.random() - 0.5).slice(0, 20)
+    quiz = { queue: pool, again: [], missed: new Set(), firstTry: 0, total: pool.length, current: null }
+    $('#words-list').hidden = true; $('#words-empty').hidden = true; $('#quiz-start').hidden = true
+    $('#quiz').hidden = false; $('#quiz-done').hidden = true; $('#quiz-card').hidden = false
+    nextCard()
+}
+const nextCard = () => {
+    if (!quiz.queue.length) { if (quiz.again.length) { quiz.queue = quiz.again; quiz.again = [] } else return finishQuiz() }
+    const w = quiz.current = quiz.queue[0]
+    const done = quiz.total - quiz.queue.length - quiz.again.length
+    $('#quiz-progress').textContent = `${done} / ${quiz.total}`
+    $('#quiz-word').textContent = w.word
+    $('#quiz-ctx').textContent = w.context && w.context.toLowerCase() !== w.word ? w.context.replace(new RegExp(escRe(w.word) + '\\w*', 'i'), '____') : ''
+    $('#quiz-def').textContent = [w.pos, w.def].filter(Boolean).join(' · ')
+    $('#quiz-def').hidden = true; $('#quiz-hint').hidden = false; $('#quiz-answers').hidden = true
+}
+const finishQuiz = () => {
+    $('#quiz-card').hidden = true; $('#quiz-answers').hidden = true; $('#quiz-done').hidden = false
+    $('#quiz-score').textContent = `${quiz.firstTry} / ${quiz.total}`
+    const r = quiz.total ? quiz.firstTry / quiz.total : 0
+    $('#quiz-msg').textContent = r === 1 ? 'flawless. go read something harder.' : r >= 0.7 ? 'solid. the rest will stick next time.' : 'they’ll stick. come back tomorrow.'
+    $('#quiz-progress').textContent = `${quiz.total} / ${quiz.total}`
+}
+const endQuiz = () => { quiz = null; $('#quiz').hidden = true; renderWords(); $('#words-list').hidden = false }
+$('#quiz-start').addEventListener('click', startQuiz)
+$('#quiz-card').addEventListener('click', () => { if (!quiz || !$('#quiz-def').hidden) return; $('#quiz-def').hidden = false; $('#quiz-hint').hidden = true; $('#quiz-answers').hidden = false })
+$('#quiz-got').addEventListener('click', () => { const w = quiz.queue.shift(); if (!quiz.missed.has(w.id)) quiz.firstTry++; nextCard() })
+$('#quiz-again').addEventListener('click', () => { const w = quiz.queue.shift(); quiz.missed.add(w.id); quiz.again.push(w); nextCard() })
+$('#quiz-quit').addEventListener('click', endQuiz)
+$('#quiz-finish').addEventListener('click', endQuiz)
+$('#quiz-restart').addEventListener('click', startQuiz)
 $('#help-close').addEventListener('click', () => { $('#help').hidden = true })
 $('#btn-find').addEventListener('click', () => openFind())
 $('#empty-find').addEventListener('click', () => openFind())

@@ -7,9 +7,11 @@ Runs as an Android app and as an installable web app for iPhone, iPad and deskto
 **Formats:** EPUB (2 and 3, including fixed layout), PDF, MOBI, AZW / AZW3 (KF8), FB2 / FB2.zip, CBZ comics, plain text, Markdown and HTML.
 
 **Shelf (web app)**
-- Stats card: minutes today and this week, day streak, milestone stickers; a "finished" shelf.
+- Streak card: flame, last-seven-days strip, best streak and a nudge; minutes today, this week and all time; milestone stickers; a "finished" shelf.
+- Time per book: the continue card and book sheet show how long you have spent in a book and a rough time left; the finish screen shows the cover-to-cover total.
+- My words: "save word" on a meaning card keeps it (with its sentence and book) in a vocabulary list with pronunciation, and a flashcard quiz to practise.
 - Tags (collections), search, and a "find free books" catalog (Project Gutenberg via Gutendex, Internet Archive) that downloads straight to the shelf.
-- Back up shelf / restore a backup: one zip with books, positions, highlights, stats and settings, for moving between devices (positions merge, furthest read wins).
+- Back up shelf / restore a backup: one zip with books, positions, highlights, stats, saved words and settings, for moving between devices (positions merge, furthest read wins).
 - Android: Dogear registers as a share target once installed from Chrome. iPhone: web apps can't join the Share sheet; the in-app tips describe a Save-to-Files shortcut.
 
 **Sources**

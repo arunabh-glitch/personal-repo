@@ -2,7 +2,7 @@
 // Two stores: `books` (metadata + cover blob) and `files` (the book file).
 
 const DB_NAME = 'openshelf'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 const FORMATS = {
     epub: 'application/epub+zip', pdf: 'application/pdf', mobi: 'application/x-mobipocket-ebook',
@@ -37,6 +37,7 @@ const open = () => dbPromise ??= new Promise((resolve, reject) => {
         if (!db.objectStoreNames.contains('files')) db.createObjectStore('files')
         if (!db.objectStoreNames.contains('highlights')) db.createObjectStore('highlights', { keyPath: 'id' }).createIndex('bookId', 'bookId')
         if (!db.objectStoreNames.contains('sessions')) db.createObjectStore('sessions', { keyPath: 'id' }).createIndex('bookId', 'bookId')
+        if (!db.objectStoreNames.contains('vocab')) db.createObjectStore('vocab', { keyPath: 'id' }).createIndex('word', 'word')
     }
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
@@ -72,6 +73,27 @@ export const sessions = {
     async put(sess) { if (!sess.id) sess.id = uuid(); await tx('sessions', 'readwrite', t => req(t.objectStore('sessions').put(sess))); return sess },
 }
 
+/** Saved words (vocabulary). One record per saved word: { id, word, phonetic, pos, def, context, bookId, bookTitle, createdAt }. */
+export const vocab = {
+    async all() { return tx('vocab', 'readonly', t => req(t.objectStore('vocab').getAll())) },
+    async find(word) { return tx('vocab', 'readonly', t => req(t.objectStore('vocab').index('word').get(word))) },
+    async put(w) { if (!w.id) w.id = uuid(); if (!w.createdAt) w.createdAt = Date.now(); w.word = String(w.word || '').toLowerCase(); await tx('vocab', 'readwrite', t => req(t.objectStore('vocab').put(w))); return w },
+    async remove(id) { return tx('vocab', 'readwrite', t => req(t.objectStore('vocab').delete(id))) },
+}
+
+/** Time spent in one book, from its sessions, plus a rough estimate of what is left at `fraction`. */
+export const bookTime = (list, fraction = 0) => {
+    let seconds = 0, covered = 0
+    for (const s of list) {
+        seconds += Math.max(0, Math.min(s.seconds || 0, 6 * 3600))
+        if (s.fractionEnd != null && s.fractionStart != null) covered += Math.max(0, Math.min(1, s.fractionEnd - s.fractionStart))
+    }
+    // a pace needs a few minutes over a measurable stretch of the book
+    const pace = seconds >= 300 && covered >= 0.01 ? seconds / covered : null
+    const remaining = pace != null ? Math.max(0, (1 - Math.min(1, fraction)) * pace) : null
+    return { seconds, remaining }
+}
+
 /** Reading statistics derived from sessions. Days are local-time calendar days. */
 export const computeStats = (list, now = Date.now()) => {
     const dayKey = ts => { const d = new Date(ts); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` }
@@ -92,7 +114,13 @@ export const computeStats = (list, now = Date.now()) => {
     let cursor = qualifies(now) ? now : qualifies(now - 86400000) ? now - 86400000 : null
     while (cursor != null && qualifies(cursor)) { streak++; cursor -= 86400000 }
     const pagesToday = list.filter(s => dayKey(s.startedAt || now) === dayKey(now)).reduce((a, s) => a + (s.pages || 0), 0)
-    return { todaySeconds: today, weekSeconds: week, totalSeconds: total, streak, pagesToday, sessions: list.length }
+    // the last 7 days, oldest first, for the week strip
+    const days = Array.from({ length: 7 }, (_, i) => { const ts = now - (6 - i) * 86400000; const seconds = byDay.get(dayKey(ts)) || 0; return { ts, seconds, read: seconds >= 120, today: i === 6 } })
+    // best streak ever
+    const readDays = [...byDay.entries()].filter(([, secs]) => secs >= 120).map(([k]) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m, d).getTime() }).sort((a, b) => a - b)
+    let bestStreak = 0, run = 0, prev = null
+    for (const ts of readDays) { run = prev != null && Math.round((ts - prev) / 86400000) === 1 ? run + 1 : 1; prev = ts; bestStreak = Math.max(bestStreak, run) }
+    return { todaySeconds: today, weekSeconds: week, totalSeconds: total, streak, bestStreak: Math.max(bestStreak, streak), todayDone: today >= 120, days, pagesToday, sessions: list.length }
 }
 
 export const library = {

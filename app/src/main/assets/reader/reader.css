@@ -194,6 +194,9 @@ body[data-theme="gray"] .dict-title h2, body[data-theme="dark"] .dict-title h2 {
 .dict-actions-row .hl-dots { display: flex; gap: 8px; margin-right: 4px; padding: 2px 0 2px 2px; flex: none; }
 .mini { border: 2px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; }
 .mini:active { background: var(--sun); color: #1e1636; }
+.mini.active { background: var(--lime); color: #1e1636; }
+.mini.popped { animation: pop 0.35s cubic-bezier(.34,1.56,.64,1); }
+.finish-time { margin: 2px 0 8px; font-family: var(--display); font-weight: 800; font-size: 15px; color: var(--ink); background: linear-gradient(transparent 55%, var(--sun) 55%, var(--sun) 92%, transparent 92%); display: inline-block; padding: 0 4px; }
 .mini.danger { color: var(--pink); }
 .btn.small { margin: 0; padding: 8px 16px; font-size: 14px; box-shadow: 3px 3px 0 #1e1636; }
 .hl-item { display: block; width: 100%; text-align: start; background: none; border: 0; padding: 12px 22px 12px 30px; border-top: 1px solid var(--hair); position: relative; font-size: 14px; line-height: 1.4; }

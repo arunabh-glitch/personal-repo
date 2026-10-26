@@ -33,7 +33,7 @@ const openDB = () => new Promise((resolve, reject) => {
 })
 const storeShared = async files => {
     await openDB()
-    const db = await new Promise((resolve, reject) => { const r = indexedDB.open('openshelf', 2); r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains('books')) d.createObjectStore('books', { keyPath: 'id' }); if (!d.objectStoreNames.contains('files')) d.createObjectStore('files'); if (!d.objectStoreNames.contains('highlights')) d.createObjectStore('highlights', { keyPath: 'id' }).createIndex('bookId', 'bookId'); if (!d.objectStoreNames.contains('sessions')) d.createObjectStore('sessions', { keyPath: 'id' }).createIndex('bookId', 'bookId') }; r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error) })
+    const db = await new Promise((resolve, reject) => { const r = indexedDB.open('openshelf', 3); r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains('books')) d.createObjectStore('books', { keyPath: 'id' }); if (!d.objectStoreNames.contains('files')) d.createObjectStore('files'); if (!d.objectStoreNames.contains('highlights')) d.createObjectStore('highlights', { keyPath: 'id' }).createIndex('bookId', 'bookId'); if (!d.objectStoreNames.contains('sessions')) d.createObjectStore('sessions', { keyPath: 'id' }).createIndex('bookId', 'bookId'); if (!d.objectStoreNames.contains('vocab')) d.createObjectStore('vocab', { keyPath: 'id' }).createIndex('word', 'word') }; r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error) })
     let n = 0
     for (const f of files) {
         const lower = (f.name || '').toLowerCase(); const ext = lower.endsWith('.fb2.zip') ? 'fbz' : lower.split('.').pop()

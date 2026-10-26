@@ -83,7 +83,27 @@ const hostStore = {
         try { const all = JSON.parse(localStorage.getItem('dogear.sessions') || '[]').filter(x => x.id !== sess.id); all.push(sess); localStorage.setItem('dogear.sessions', JSON.stringify(all.slice(-500))) } catch { /* ignore */ }
     },
     markFinished() { try { native?.markFinished?.() } catch { /* ignore */ } },
+    async listSessions(bookId) {
+        if (native?.listSessions) return JSON.parse(await native.listSessions()) || []
+        try { return JSON.parse(localStorage.getItem('dogear.sessions') || '[]').filter(s => s.bookId === bookId) } catch { return [] }
+    },
+    // vocabulary (saved words)
+    async listWords() {
+        if (native?.listWords) return JSON.parse(await native.listWords()) || []
+        try { return JSON.parse(localStorage.getItem('dogear.vocab') || '[]') } catch { return [] }
+    },
+    async saveWord(w) {
+        w.id ||= uuid(); w.createdAt ||= Date.now()
+        if (native?.saveWord) { await native.saveWord(JSON.stringify(w)); return w }
+        const list = (await this.listWords()).filter(x => x.id !== w.id); list.push(w)
+        localStorage.setItem('dogear.vocab', JSON.stringify(list)); return w
+    },
+    async removeWord(id) {
+        if (native?.deleteWord) return native.deleteWord(id)
+        localStorage.setItem('dogear.vocab', JSON.stringify((await this.listWords()).filter(x => x.id !== id)))
+    },
 }
+const fmtDuration = secs => { const m = Math.round(secs / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min` }
 
 const formatContributor = c => {
     if (!c) return ''
@@ -525,6 +545,8 @@ class Reader {
         $('#dict-source').textContent = ''
         $('#dict-speak').hidden = true
         $('#dict-more').hidden = true
+        $('#act-save').hidden = true
+        this.dictResult = null
         const body = $('#dict-body')
         body.innerHTML = '<div class="dict-loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>'
         let result = null, error = null
@@ -558,6 +580,52 @@ class Reader {
             </section>`).join('')
         body.querySelectorAll('.dict-chip').forEach(b => b.addEventListener('click', () => this.define(b.dataset.word)))
         body.scrollTop = 0
+        this.dictResult = r
+        this.#syncSaveWord()
+    }
+
+    // ---------- vocabulary ----------
+    async #syncSaveWord() {
+        const r = this.dictResult, btn = $('#act-save')
+        if (!r) return
+        const list = await hostStore.listWords().catch(() => [])
+        if (this.dictResult !== r) return
+        this.savedWord = list.find(w => w.word === r.word.toLowerCase()) || null
+        btn.hidden = false
+        btn.textContent = this.savedWord ? 'saved ✓' : 'save word'
+        btn.classList.toggle('active', !!this.savedWord)
+    }
+    async toggleSaveWord() {
+        const r = this.dictResult, btn = $('#act-save')
+        if (!r) return
+        if (this.savedWord) {
+            await hostStore.removeWord(this.savedWord.id).catch(() => {})
+            this.savedWord = null
+            this.toast('removed from your words')
+        } else {
+            const m = r.meanings?.[0]
+            const w = { word: r.word.toLowerCase(), phonetic: r.phonetic || '', pos: m?.pos || '', def: m?.defs?.[0]?.def || '', context: this.#contextSentence(), bookId: this.info?.id, bookTitle: $('#title').textContent }
+            this.savedWord = await hostStore.saveWord(w)
+            this.toast('saved to your words')
+            btn.classList.remove('popped'); void btn.offsetWidth; btn.classList.add('popped')
+        }
+        btn.textContent = this.savedWord ? 'saved ✓' : 'save word'
+        btn.classList.toggle('active', !!this.savedWord)
+    }
+    /** The sentence around the held word, for the vocabulary card. */
+    #contextSentence() {
+        const r = this.pending?.range
+        const phrase = (this.dictPhrase || '').slice(0, 200)
+        const fallback = phrase.toLowerCase() === (this.dictResult?.word || '').toLowerCase() ? '' : phrase
+        if (!r || r.startContainer.nodeType !== 3) return fallback
+        const text = r.startContainer.data
+        let st = r.startOffset, en = r.endContainer === r.startContainer ? r.endOffset : text.length
+        while (st > 0 && !/[.!?]/.test(text[st - 1])) st--
+        while (st < text.length && /\s/.test(text[st])) st++
+        while (en < text.length && !/[.!?]/.test(text[en])) en++
+        if (en < text.length) en++
+        const sentence = text.slice(st, en).replace(/\s+/g, ' ').trim()
+        return (sentence.length > 240 ? sentence.slice(0, 237).trimEnd() + '…' : sentence) || fallback
     }
 
     closeDictionary() {
@@ -798,6 +866,14 @@ class Reader {
         localStorage.setItem(key, '1')
         hostStore.markFinished()
         $('#finish-title').textContent = $('#title').textContent
+        $('#finish-time').hidden = true
+        hostStore.listSessions(this.info.id).then(list => {
+            const cur = this.session
+            const secs = list.filter(s => s.id !== cur?.id).reduce((a, s) => a + Math.min(s.seconds || 0, 6 * 3600), 0) + (cur?.seconds || 0)
+            if (secs < 60) return
+            $('#finish-time').textContent = `${fmtDuration(secs)} of reading, cover to cover`
+            $('#finish-time').hidden = false
+        }).catch(() => {})
         $('#finish').hidden = false
         this.#confetti()
     }
@@ -885,6 +961,7 @@ class Reader {
         $$('#dict-card [data-hl]').forEach(d => d.addEventListener('click', () => this.saveHighlight(d.dataset.hl)))
         $('#act-sentence').addEventListener('click', () => this.#expandPendingToSentence())
         $('#act-note').addEventListener('click', () => this.openHighlightMenu(null))
+        $('#act-save').addEventListener('click', () => this.toggleSaveWord())
         $('#act-copy').addEventListener('click', () => this.#copy(this.pending?.range?.toString() || this.dictPhrase))
         $$('#sel-bar [data-sel]').forEach(b => b.addEventListener('click', () => this.#selAction(b.dataset.sel)))
         $$('#toc-tabs .tab').forEach(t => t.addEventListener('click', () => {

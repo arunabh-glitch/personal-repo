@@ -23,6 +23,8 @@
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></symbol>
   <symbol id="i-backup" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
   <symbol id="i-restore" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></symbol>
+  <symbol id="i-words" viewBox="0 0 24 24"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2zm-5 9.6-2.9 1.8.8-3.3-2.6-2.2 3.4-.3L12 5.5l1.3 3.1 3.4.3-2.6 2.2.8 3.3z"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M13.5 1.5s.8 3.2-1.2 5.6c-1.4 1.7-3.1 3-3.1 5.6 0 .9.3 1.8.8 2.4-.4-2.6 1.6-3.6 1.6-3.6s-.4 2.7 1.6 4.3c1 .8 1.3 1.9 1.1 3.1 2.6-1 4.2-3.3 4.2-6.2 0-5.7-5-6.2-5-11.2zM12 22c-4.4 0-7.5-3-7.5-7.2 0-3.4 2.1-5.3 3.7-7 .4 2.3 1.3 3.6 2.6 4.6-.6-3 .6-5.5 2.3-7.4 1.4 3.2 6.4 5.3 6.4 10.1C19.5 19 16.4 22 12 22z"/></symbol>
   <symbol id="i-tips" viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></symbol>
 </svg>
 <div class="blobs" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
@@ -75,6 +77,7 @@
         <div id="cc-title" class="cc-title"></div>
         <div id="cc-author" class="cc-author"></div>
         <div id="cc-where" class="cc-where"></div>
+        <div id="cc-time" class="cc-time" hidden></div>
         <div class="cc-bar"><i id="cc-bar"></i></div>
       </div>
       <span class="cc-go">read</span>
@@ -82,9 +85,21 @@
   </section>
 
   <section id="stats" class="stats" hidden>
-    <div class="stat"><b id="st-today">0m</b><span>today</span></div>
-    <div class="stat"><b id="st-week">0m</b><span>this week</span></div>
-    <div class="stat"><b id="st-streak">0</b><span>day streak</span></div>
+    <div class="streak-card">
+      <div class="streak-main">
+        <i class="flame" aria-hidden="true"><svg><use href="#i-flame"/></svg></i>
+        <div class="streak-num"><b id="st-streak">0</b><span id="st-streak-label">day streak</span></div>
+        <span id="st-best" class="streak-best" hidden></span>
+      </div>
+      <div id="st-days" class="week-strip" aria-label="Last seven days"></div>
+      <p id="st-nudge" class="streak-nudge"></p>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><b id="st-today">0m</b><span>today</span></div>
+      <div class="stat"><b id="st-week">0m</b><span>this week</span></div>
+      <div class="stat"><b id="st-total">0m</b><span>all time</span></div>
+      <button class="stat words" id="st-words"><b id="st-words-n">0</b><span>words saved</span></button>
+    </div>
     <div id="st-stickers" class="stickers"></div>
   </section>
 
@@ -130,9 +145,10 @@
   <div class="sheet-title">more</div>
   <button class="sheet-btn" data-more="find"><i class="mi c-blue"><svg><use href="#i-search"/></svg></i>find free books</button>
   <button class="sheet-btn" data-more="url"><i class="mi c-lilac"><svg><use href="#i-link"/></svg></i>add from a link</button>
+  <button class="sheet-btn" data-more="words"><i class="mi c-pink"><svg><use href="#i-words"/></svg></i>my words</button>
   <button class="sheet-btn" data-more="backup"><i class="mi c-lime"><svg><use href="#i-backup"/></svg></i>back up shelf</button>
   <button class="sheet-btn" data-more="restore"><i class="mi c-sun"><svg><use href="#i-restore"/></svg></i>restore a backup</button>
-  <button class="sheet-btn" data-more="help"><i class="mi c-pink"><svg><use href="#i-tips"/></svg></i>tips &amp; shortcuts</button>
+  <button class="sheet-btn" data-more="help"><i class="mi c-lilac"><svg><use href="#i-tips"/></svg></i>tips &amp; shortcuts</button>
   <button class="sheet-btn" data-more="cancel">never mind</button>
 </div>
 <input id="restore-input" type="file" accept=".zip,application/zip" hidden>
@@ -147,6 +163,37 @@
   <button id="find-more" class="mini" hidden>more</button>
 </div>
 
+<div id="words" class="panel-full" hidden>
+  <div class="pf-head">
+    <button class="icon c-lilac" id="words-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button>
+    <h2>my words</h2>
+    <button id="quiz-start" class="pill c-lime" hidden>quiz me</button>
+  </div>
+  <p id="words-count" class="muted words-count"></p>
+  <div id="words-list" class="words-list"></div>
+  <div id="words-empty" class="words-empty" hidden>
+    <p><strong>no words yet.</strong> hold a word while reading, then tap <b>save word</b> on its meaning card. they land here, ready to revisit or quiz yourself on.</p>
+  </div>
+  <div id="quiz" class="quiz" hidden>
+    <div class="quiz-top"><span id="quiz-progress" class="quiz-progress"></span><button id="quiz-quit" class="mini">quit</button></div>
+    <button id="quiz-card" class="quiz-card">
+      <span class="quiz-word" id="quiz-word"></span>
+      <span class="quiz-ctx" id="quiz-ctx"></span>
+      <span class="quiz-hint" id="quiz-hint">tap to reveal</span>
+      <span class="quiz-def" id="quiz-def" hidden></span>
+    </button>
+    <div id="quiz-answers" class="quiz-answers" hidden>
+      <button id="quiz-again" class="btn-chip c-pink">again</button>
+      <button id="quiz-got" class="btn-chip c-lime">got it</button>
+    </div>
+    <div id="quiz-done" class="quiz-done" hidden>
+      <span class="sticker-big" id="quiz-score"></span>
+      <p id="quiz-msg"></p>
+      <div class="row-inline"><button id="quiz-restart" class="pill c-lime">go again</button><button id="quiz-finish" class="pill">done</button></div>
+    </div>
+  </div>
+</div>
+
 <div id="help" class="panel-full" hidden>
   <div class="pf-head"><button class="icon c-lilac" id="help-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button><h2>tips</h2></div>
   <div class="help-body">
@@ -156,6 +203,8 @@
       <li><b>select text instead</b> (in Display) turns on normal text selection with a small toolbar, for copying or highlighting any passage.</li>
       <li><b>listen</b> (headphones in the bottom bar) reads aloud and follows along sentence by sentence.</li>
       <li><b>presets</b> in Display: cosy, focus, night owl.</li>
+      <li><b>save word</b> on a meaning card keeps it in <b>my words</b> (in the more menu, or tap “words saved”). quiz yourself there with flashcards.</li>
+      <li>the <b>streak card</b> counts days with at least two minutes of reading. the shelf shows how long you’ve spent in each book and a rough time left.</li>
     </ul>
     <h3>shelf</h3>
     <ul>
