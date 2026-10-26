@@ -163,7 +163,7 @@ $('#sheet').addEventListener('click', async e => {
         const v = prompt('tags, comma separated (e.g. sci-fi, to read):', (b.tags || []).join(', '))
         if (v !== null) { const tags = [...new Set(v.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))]; await library.update(b.id, { tags }); await reload(); toast(tags.length ? 'tagged ✓' : 'tags cleared') }
     }
-    else if (act === 'finished') { await library.update(b.id, isFinished(b) ? { finishedAt: null, progress: Math.min(b.progress || 0, 0.97) } : { finishedAt: Date.now() }); await reload(); toast(isFinished(b) ? 'back on the shelf' : 'finished!'); if (!isFinished(b)) mascot.act('pulse') }
+    else if (act === 'finished') { await library.update(b.id, isFinished(b) ? { finishedAt: null, progress: Math.min(b.progress || 0, 0.97) } : { finishedAt: Date.now() }); await reload(); toast(isFinished(b) ? 'back on the shelf' : 'finished!'); if (!isFinished(b)) mascot.act('happy') }
     else if (act === 'details') alert(`${b.title}\n${b.author || 'Unknown author'}\n${formatLabel(b.format)} · ${fmtSize(b.size)}\n${b.progressLabel || 'Not started'} (${pctOf(b)}%)\n${timeLine(b) || 'No reading time yet'}\nAdded ${new Date(b.addedAt).toLocaleString()}${b.sourceUrl ? '\n' + b.sourceUrl : ''}`)
     else if (act === 'delete') {
         if (confirm(`remove “${b.title}” from your shelf?`)) { await library.remove(b.id); urls.delete(b.id); await reload(); toast('gone') }
@@ -171,34 +171,23 @@ $('#sheet').addEventListener('click', async e => {
     hideSheet()
 })
 
-// ---- the glowing dot's idle life: a small act every so often, dims when you've been away, flashes when something good happens ----
+// ---- the brand's small reactions: a hop and a brighter sparkle when something good happens, a doze when you've been away ----
 const mascotLife = () => {
-    const m = $('.top .mascot')
-    if (!m || matchMedia('(prefers-reduced-motion: reduce)').matches) return { act: () => {} }
-    const ACTS = [['pulse', 900, 3], ['flicker', 700, 1], ['bob', 800, 2]]
-    let busy = null, lastTouch = Date.now(), asleep = false
-    const clear = () => { if (busy) { clearTimeout(busy.t); m.classList.remove('is-' + busy.name); busy = null } }
-    const act = (name, ms, force = false) => {
-        if (busy && !force) return
-        if (force) clear()
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return { act: () => {} }
+    const targets = () => [...document.querySelectorAll('.mascot, .brand-mark')]
+    let lastTouch = Date.now(), asleep = false, timer = null
+    const act = (name = 'happy', ms = 1500) => {
         if (asleep) wake()
-        m.classList.add('is-' + name)
-        busy = { name, t: setTimeout(() => { m.classList.remove('is-' + name); busy = null }, ms) }
+        clearTimeout(timer)
+        for (const el of targets()) { el.classList.remove('is-' + name); void el.getBoundingClientRect(); el.classList.add('is-' + name) }
+        timer = setTimeout(() => targets().forEach(el => el.classList.remove('is-' + name)), ms)
     }
-    const pick = () => { let r = Math.random() * ACTS.reduce((a, x) => a + x[2], 0); return ACTS.find(x => (r -= x[2]) < 0) || ACTS[0] }
-    const nap = () => { asleep = true; m.classList.add('is-sleepy') }
-    const wake = () => { if (!asleep) return; asleep = false; m.classList.remove('is-sleepy'); act('pulse', 900, true) }
-    const tick = () => {
-        if (document.visibilityState === 'visible') {
-            if (!asleep && Date.now() - lastTouch > 60000) nap()
-            else if (!asleep) { const [name, ms] = pick(); act(name, ms) }
-        }
-        setTimeout(tick, 4000 + Math.random() * 6000)
-    }
-    setTimeout(tick, 2500)
+    const nap = () => { asleep = true; targets().forEach(el => el.classList.add('is-sleepy')) }
+    const wake = () => { if (!asleep) return; asleep = false; targets().forEach(el => el.classList.remove('is-sleepy')) }
+    setInterval(() => { if (document.visibilityState === 'visible' && !asleep && Date.now() - lastTouch > 60000) nap() }, 5000)
     document.addEventListener('pointerdown', () => { lastTouch = Date.now(); if (asleep) wake() }, { passive: true })
-    $('.top h1').addEventListener('click', () => act('pulse', 900, true))
-    return { act: (name = 'pulse', ms = 900) => act(name, ms, true) }
+    $('.brand-mark')?.addEventListener('click', () => act('happy'))
+    return { act }
 }
 const mascot = mascotLife()
 // size the page to the visible viewport (Android browsers can report dynamic viewport units taller than what is visible)
@@ -219,7 +208,7 @@ const importFiles = async files => {
     busy(false)
     await reload()
     if (failed.length) toast(`couldn’t add: ${failed.join(', ')}`, 4000)
-    else { toast(ok === 1 ? 'on the shelf' : `${ok} books on the shelf`); mascot.act('pulse') }
+    else { toast(ok === 1 ? 'on the shelf' : `${ok} books on the shelf`); mascot.act('happy') }
     if (ok) library.persist()
 }
 

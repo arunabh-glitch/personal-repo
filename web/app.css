@@ -33,20 +33,32 @@ h1, h2 { font-family: var(--display); margin: 0; letter-spacing: -0.02em; font-v
 
 .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: calc(14px + var(--sat)) 18px 8px; max-width: 1100px; width: 100%; margin: 0 auto; flex: none; }
 .brand { display: flex; align-items: center; gap: 12px; min-height: 52px; }
-/* the mark: a flat sun-yellow dot, which is the dot of the i in the wordmark */
+/* brand: wordmark (monoline rounded letters; the L has a blue page behind it; the i's dot is the light) */
+.brand-mark { display: flex; align-items: center; margin: 0; }
+.wordmark { height: 36px; width: auto; overflow: visible; display: block; }
+.w-ink { fill: none; stroke: var(--ink); stroke-width: 24; stroke-linecap: round; stroke-linejoin: round; }
+.w-back { fill: none; stroke: var(--blue); stroke-width: 24; stroke-linecap: round; stroke-linejoin: round; }
+.w-dot { fill: var(--sun); transform-box: fill-box; transform-origin: center; }
+.brand-mark.is-happy .w-dot { animation: pop-orb 0.7s cubic-bezier(.34,1.56,.64,1); }
+@keyframes pop-orb { 0%, 100% { transform: scale(1) } 35% { transform: scale(1.4) } }
+/* mascot: a round blob reading a blue book, with a sparkle */
 .mascot { overflow: visible; }
-.m-orb { fill: var(--sun); stroke: var(--ink); stroke-width: 2.5; transform-box: fill-box; transform-origin: center; }
-h1 .i { position: relative; display: inline-block; }
-h1 .i .mascot { position: absolute; width: 15px; height: 15px; left: calc(50% - 2px); top: -3px; transform: translateX(-50%); }
-/* small acts, added by app.js as is-* classes */
-.mascot.is-pulse .m-orb { animation: pop-orb 0.7s cubic-bezier(.34,1.56,.64,1); }
-@keyframes pop-orb { 0%, 100% { transform: scale(1) } 35% { transform: scale(1.35) } }
-.mascot.is-flicker .m-orb { animation: flicker 0.6s steps(1) 1; }
-@keyframes flicker { 0%, 100% { opacity: 1 } 20% { opacity: 0.3 } 30% { opacity: 1 } 55% { opacity: 0.45 } 65% { opacity: 1 } }
-.mascot.is-bob { animation: bob-dot 0.8s cubic-bezier(.34,1.56,.64,1); }
-@keyframes bob-dot { 0%, 100% { transform: translate(-50%, 0) } 40% { transform: translate(-50%, -6px) } }
-.mascot.is-sleepy .m-orb { opacity: 0.55; transition: opacity 1.5s; }
-@media (prefers-reduced-motion: reduce) { .mascot, .mascot * { animation: none !important; transition: none !important; } }
+.b-body { fill: #f4efff; stroke: var(--ink); stroke-width: 2.5; paint-order: stroke; }
+@media (prefers-color-scheme: dark) { .b-body { stroke: none; } }
+.b-shadow { fill: var(--ink); opacity: 0.16; }
+.b-eye { fill: #1e1636; transform-box: fill-box; transform-origin: center; animation: blink 5.2s infinite; }
+.b-eye-happy, .b-eye-sleep { fill: none; stroke: #1e1636; stroke-width: 3; stroke-linecap: round; display: none; }
+.mascot.is-happy .b-eye, .mascot.is-sleepy .b-eye { display: none; }
+.mascot.is-happy .b-eye-happy, .mascot.is-sleepy .b-eye-sleep { display: block; }
+.b-page-l { fill: var(--blue); } .b-page-r { fill: #7d98ff; }
+.b-leaf { fill: none; stroke: #fff; stroke-opacity: 0.5; stroke-width: 2; stroke-linecap: round; }
+.b-spark { fill: var(--sun); transform-box: fill-box; transform-origin: center; animation: twinkle 4s ease-in-out infinite; }
+@keyframes twinkle { 0%, 70%, 100% { transform: scale(1) rotate(0) } 80% { transform: scale(0.6) rotate(45deg) } 90% { transform: scale(1.15) rotate(90deg) } }
+@keyframes blink { 0%, 94%, 100% { transform: scaleY(1) } 97% { transform: scaleY(0.1) } }
+.mascot.is-happy { animation: hop 0.7s cubic-bezier(.34,1.56,.64,1); } .mascot.is-happy .b-spark { animation: twinkle 0.9s ease-in-out; }
+@keyframes hop { 0%, 100% { transform: translateY(0) } 40% { transform: translateY(-8px) } }
+.mascot.is-sleepy .b-spark { opacity: 0.35; animation: none; }
+@media (prefers-reduced-motion: reduce) { .mascot, .mascot *, .brand-mark * { animation: none !important; transition: none !important; } }
 h1 { font-size: 34px; font-weight: 800; line-height: 1; }
 .hl { background: linear-gradient(transparent 52%, var(--lime) 52%, var(--lime) 92%, transparent 92%); padding: 0 4px; }
 @media (prefers-color-scheme: dark) { .hl { background: linear-gradient(transparent 52%, var(--blue) 52%, var(--blue) 92%, transparent 92%); } }
@@ -104,7 +116,7 @@ main { flex: 1; min-height: 0; width: 100%; overflow-y: auto; overflow-x: hidden
 .a { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .empty { text-align: center; padding: 30px 18px 20px; }
-.empty-art { width: 64px; height: 64px; }
+.empty-art { width: 150px; height: 150px; }
 @keyframes bob { 0%, 100% { transform: translateY(0) rotate(-2deg) } 50% { transform: translateY(-8px) rotate(2deg) } }
 .empty h2 { font-size: 30px; margin: 8px 0 8px; font-weight: 800; }
 .muted { color: var(--muted); font-size: 15px; line-height: 1.5; max-width: 30em; margin: 0 auto; font-weight: 500; }
