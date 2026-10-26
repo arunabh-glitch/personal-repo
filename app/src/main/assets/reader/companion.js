@@ -67,7 +67,7 @@ export class Companion {
         if (!this.enabled || !text) return false
         this.bubble.textContent = text
         // a visible way into the conversation, right in the bubble
-        if (chat && this.onTap) { const b = document.createElement('button'); b.type = 'button'; b.className = 'comp-chat'; b.textContent = 'chat'; b.setAttribute('aria-label', 'Chat with Lumi'); this.bubble.append(b) }
+        if (chat && this.onTap) { const b = document.createElement('button'); b.type = 'button'; b.className = 'comp-chat'; b.setAttribute('aria-label', 'Chat with Lumi'); b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3C6.5 3 2 6.7 2 11.2c0 2.4 1.3 4.6 3.4 6.1L4.5 21l4.3-2.1c1 .3 2.1.4 3.2.4 5.5 0 10-3.7 10-8.2S17.5 3 12 3z"/><circle cx="8" cy="11.3" r="1.3" fill="var(--pink)"/><circle cx="12" cy="11.3" r="1.3" fill="var(--pink)"/><circle cx="16" cy="11.3" r="1.3" fill="var(--pink)"/></svg>'; this.bubble.append(b) }
         this.bubble.hidden = false
         this.bubble.classList.remove('pop'); void this.bubble.offsetWidth; this.bubble.classList.add('pop')
         clearTimeout(this.sayTimer); this.sayTimer = setTimeout(() => this.hush(), ms)
