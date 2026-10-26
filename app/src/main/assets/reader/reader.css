@@ -259,13 +259,6 @@ body[data-theme="gray"] .dict-title h2, body[data-theme="dark"] .dict-title h2 {
 .voice-hint b { color: var(--ink); }
 
 /* Lumi on the finish screen */
-.finish-mascot { width: 120px; height: 120px; overflow: visible; margin: -10px auto 2px; display: block; animation: hop 0.7s cubic-bezier(.34,1.56,.64,1); }
-.finish-mascot .b-body { fill: #f4efff; stroke: var(--ink); stroke-width: 2.5; paint-order: stroke; }
-body[data-theme="gray"] .finish-mascot .b-body, body[data-theme="dark"] .finish-mascot .b-body { stroke: none; }
-.finish-mascot .b-shadow { fill: var(--ink); opacity: 0.16; } .finish-mascot .b-eye { display: none; }
-.finish-mascot .b-eye-happy { fill: none; stroke: #1e1636; stroke-width: 3; stroke-linecap: round; } .finish-mascot .b-eye-sleep { display: none; }
-.finish-mascot .b-page-l { fill: var(--blue); } .finish-mascot .b-page-r { fill: #7d98ff; }
-.finish-mascot .b-leaf { fill: none; stroke: #fff; stroke-opacity: 0.5; stroke-width: 2; stroke-linecap: round; }
-.finish-mascot .b-spark { fill: var(--sun); transform-box: fill-box; transform-origin: center; animation: twinkle 1.2s ease-in-out infinite; }
-@keyframes twinkle { 0%, 70%, 100% { transform: scale(1) rotate(0) } 80% { transform: scale(0.6) rotate(45deg) } 90% { transform: scale(1.15) rotate(90deg) } }
-@keyframes hop { 0%, 100% { transform: translateY(0) } 40% { transform: translateY(-8px) } }
+.finish-mascot { width: 128px; height: auto; display: block; margin: -4px auto 4px; animation: hop 0.7s cubic-bezier(.34,1.56,.64,1); }
+body[data-theme="light"] .finish-mascot, body[data-theme="sepia"] .finish-mascot { filter: drop-shadow(0 3px 3px rgba(30,22,54,0.16)); }
+@keyframes hop { 0%, 100% { transform: translateY(0) } 40% { transform: translateY(-10px) } }

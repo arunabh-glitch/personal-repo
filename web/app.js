@@ -171,25 +171,32 @@ $('#sheet').addEventListener('click', async e => {
     hideSheet()
 })
 
-// ---- the brand's small reactions: a hop and a brighter sparkle when something good happens, a doze when you've been away ----
+// ---- Lumi's poses: reading by default, happy when something good happens, under a blanket when you've been away ----
+const POSE = { reading: 'reader/brand/lumi-reading.png', happy: 'reader/brand/lumi-happy.png', sleepy: 'reader/brand/lumi-blanket.png' }
 const mascotLife = () => {
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return { act: () => {} }
-    const targets = () => [...document.querySelectorAll('.mascot, .brand-mark')]
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+    const art = () => $('.empty-art')
+    const pose = name => { const img = art(); if (!img || img.dataset.pose === name) return; img.dataset.pose = name; img.src = POSE[name] }
     let lastTouch = Date.now(), asleep = false, timer = null
-    const act = (name = 'happy', ms = 1500) => {
+    const act = (name = 'happy', ms = 1800) => {
         if (asleep) wake()
         clearTimeout(timer)
-        for (const el of targets()) { el.classList.remove('is-' + name); void el.getBoundingClientRect(); el.classList.add('is-' + name) }
-        timer = setTimeout(() => targets().forEach(el => el.classList.remove('is-' + name)), ms)
+        pose(name)
+        const img = art(); if (img && !still) { img.classList.remove('is-happy'); void img.offsetWidth; img.classList.add('is-happy') }
+        $('.brand-mark')?.classList.add('is-happy')
+        timer = setTimeout(() => { pose(asleep ? 'sleepy' : 'reading'); art()?.classList.remove('is-happy'); $('.brand-mark')?.classList.remove('is-happy') }, ms)
     }
-    const nap = () => { asleep = true; targets().forEach(el => el.classList.add('is-sleepy')) }
-    const wake = () => { if (!asleep) return; asleep = false; targets().forEach(el => el.classList.remove('is-sleepy')) }
+    const nap = () => { asleep = true; pose('sleepy') }
+    const wake = () => { if (!asleep) return; asleep = false; pose('reading') }
     setInterval(() => { if (document.visibilityState === 'visible' && !asleep && Date.now() - lastTouch > 60000) nap() }, 5000)
     document.addEventListener('pointerdown', () => { lastTouch = Date.now(); if (asleep) wake() }, { passive: true })
     $('.brand-mark')?.addEventListener('click', () => act('happy'))
+    for (const k of ['happy', 'sleepy']) { const i = new Image(); i.src = POSE[k] }
     return { act }
 }
 const mascot = mascotLife()
+// Lumi thinks in the find panel until real results arrive
+{ const res = $('#find-results'), hero = $('.find-hero'); if (res && hero) new MutationObserver(() => { hero.hidden = !!res.querySelector('button, article, .find-item') }).observe(res, { childList: true }) }
 // size the page to the visible viewport (Android browsers can report dynamic viewport units taller than what is visible)
 const fitViewport = () => { const h = window.visualViewport?.height || window.innerHeight; if (h > 200) document.documentElement.style.setProperty('--vvh', Math.round(h) + 'px') }
 fitViewport(); window.visualViewport?.addEventListener('resize', fitViewport); window.addEventListener('resize', fitViewport)

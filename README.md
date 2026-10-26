@@ -1,6 +1,6 @@
 # Lumi
 
-Lumi means light. The mascot is a small round reader with a blue book and a sparkle; the wordmark carries a blue page behind the L and a yellow dot on the i.
+Lumi means light. Lumi is your reading companion: a small round reader with a blue book and a sparkle, who sits on the empty shelf, naps under a blanket when you are away, and celebrates when you finish a book. The wordmark carries a blue page behind the L and a sparkle on the i.
 
 A cosy e-book reader with a built-in dictionary. Fold the corner, pick up where you left off.
 
