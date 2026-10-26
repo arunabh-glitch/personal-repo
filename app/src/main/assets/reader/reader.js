@@ -22,8 +22,8 @@ const PRESETS = {
 const HL_COLORS = { lime: 'rgba(198,242,78,0.6)', pink: 'rgba(255,92,168,0.45)', blue: 'rgba(143,176,255,0.55)', sun: 'rgba(255,210,63,0.6)' }
 const uuid = () => crypto.randomUUID?.() ?? String(Date.now()) + Math.random().toString(16).slice(2)
 const THEMES = {
-    light: { bg: '#f7f2e8', fg: '#1b1813', link: '#1a5fb4', dark: false, force: false },
-    sepia: { bg: '#f1e6d0', fg: '#4a3a2a', link: '#8b4513', dark: false, force: true },
+    light: { bg: '#fffdf8', fg: '#1e1636', link: '#1a5fb4', dark: false, force: false },
+    sepia: { bg: '#f3e7cf', fg: '#3f2f22', link: '#8b4513', dark: false, force: true },
     gray:  { bg: '#2a2724', fg: '#e2dbd0', link: '#8ab4f8', dark: true, force: true },
     dark:  { bg: '#000000', fg: '#d9d2c7', link: '#8ab4f8', dark: true, force: true },
 }
@@ -244,7 +244,7 @@ class Reader {
         return `
             @namespace epub "http://www.idpf.org/2007/ops";
             ${s.selectMode ? '' : '@media (pointer: coarse) { html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } }'}
-            html { color-scheme: ${t.dark ? 'dark' : 'light'}; }
+            html { color-scheme: ${t.dark ? 'dark' : 'light'}; --theme-bg-color: ${t.bg}; }
             html, body { background: ${t.bg} !important; color: ${t.fg} !important; }
             html { font-size: ${s.fontSize}px !important; }
             body { font-size: 1em !important; }
@@ -904,6 +904,9 @@ class Reader {
         $$('.ls-rates button').forEach(b => b.addEventListener('click', () => { this.listener?.setRate(+b.dataset.rate); $$('.ls-rates button').forEach(x => x.classList.toggle('active', x === b)) }))
         $('#finish-shelf').addEventListener('click', () => bridge.close())
         $('#finish-stay').addEventListener('click', () => { $('#finish').hidden = true })
+        // the body must never scroll: hidden sheets hang below it and a focus-scroll would shift the whole UI
+        const unscroll = () => { if (document.body.scrollTop || document.body.scrollLeft) { document.body.scrollTop = 0; document.body.scrollLeft = 0 } }
+        document.body.addEventListener('scroll', unscroll); window.addEventListener('focusin', () => setTimeout(unscroll, 50))
         window.addEventListener('pagehide', () => this.#endSession())
         document.addEventListener('visibilitychange', () => { if (document.hidden) this.#endSession(); else this.#startSession() })
 
