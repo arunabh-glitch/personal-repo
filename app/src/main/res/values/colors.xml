@@ -8,6 +8,6 @@
     <color name="on_surface">#1E1636</color>
     <color name="outline">#6F6684</color>
     <color name="accent">#FF5CA8</color>
-    <color name="ic_launcher_background">#B388FF</color>
+    <color name="ic_launcher_background">#1E1636</color>
     <color name="reader_background">#FFFFFF</color>
 </resources>

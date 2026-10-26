@@ -1,6 +1,6 @@
 # Lumi
 
-Lumi is a glow-worm: the bookworm that lights your page.
+Lumi means light: the mark is a glowing dot, the dot of the i, that keeps your page lit.
 
 A cosy e-book reader with a built-in dictionary. Fold the corner, pick up where you left off.
 
