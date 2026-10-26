@@ -166,3 +166,9 @@ main { padding: 6px 18px calc(110px + var(--sab)); max-width: 1100px; margin: 0 
 .help-body h3 { font-family: var(--display); font-weight: 800; margin: 18px 0 6px; font-size: 18px; }
 .help-body ul { padding-left: 18px; margin: 0; } .help-body li { margin: 6px 0; }
 .help-body b { font-weight: 800; }
+
+/* menu icons */
+.sheet-btn { display: flex; align-items: center; gap: 12px; }
+.mi { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.mi svg { width: 18px; height: 18px; fill: #1e1636; }
+.mi.c-blue { background: var(--blue); } .mi.c-blue svg { fill: #fff; } .mi.c-lilac { background: var(--lilac); } .mi.c-lime { background: var(--lime); } .mi.c-sun { background: var(--sun); } .mi.c-pink { background: var(--pink); } .mi.c-pink svg { fill: #fff; }

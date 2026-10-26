@@ -630,7 +630,7 @@ class Reader {
         this.closeDictionary()
         this.#drawSaved(h)
         this.#renderHighlightList()
-        this.toast(note ? 'note saved ✍️' : 'highlighted 🖍')
+        this.toast(note ? 'note saved' : 'highlighted')
         return h
     }
     #drawSaved(h) {
@@ -687,7 +687,7 @@ class Reader {
             h.note = note; h.color = this.hlmColor
             await hostStore.save(this.info.id, h)
             if (colorChanged) { this.#removeDrawn(h); delete h._ann; this.#drawSaved(h) }
-            this.#renderHighlightList(); this.closePanels(); this.toast('saved ✓')
+            this.#renderHighlightList(); this.closePanels(); this.toast('saved')
         } else {
             this.closePanels()
             await this.saveHighlight(this.hlmColor, note)
@@ -740,7 +740,7 @@ class Reader {
             $('#btn-listen').classList.toggle('on', st !== 'idle')
             if (st === 'idle') this.#ttsHighlight(null)
         })
-        this.listener.addEventListener('done', () => this.toast('end of book 🎧'))
+        this.listener.addEventListener('done', () => this.toast('end of book'))
         $$('.ls-rates button').forEach(x => x.classList.toggle('active', +x.dataset.rate === this.listener.rate))
         this.showBars(false)
         try { await this.listener.start() } catch (e) { this.toast(e.message) }
@@ -879,7 +879,7 @@ class Reader {
         const langSel = $('#sel-lang')
         langSel.innerHTML = LANGS.map(([c, n]) => `<option value="${c}">${n}</option>`).join('')
         langSel.addEventListener('change', e => this.#update({ translateTo: e.target.value }))
-        $$('.chip.preset').forEach(c => c.addEventListener('click', () => { this.#update({ ...PRESETS[c.dataset.preset] }); this.toast(`${c.textContent.trim()} ✓`) }))
+        $$('.chip.preset').forEach(c => c.addEventListener('click', () => { this.#update({ ...PRESETS[c.dataset.preset] }); this.toast(`${c.textContent.trim()} preset`) }))
         $('#dict-close').addEventListener('click', () => this.closeDictionary())
         $$('[data-dtab]').forEach(t => t.addEventListener('click', () => this.#dictTab(t.dataset.dtab)))
         $$('#dict-card [data-hl]').forEach(d => d.addEventListener('click', () => this.saveHighlight(d.dataset.hl)))

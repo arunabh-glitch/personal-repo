@@ -24,7 +24,7 @@ const coverUrl = book => {
 // A cover that fails to load is discarded so the reader regenerates it on the next open.
 const healCover = book => library.update(book.id, { cover: null, metadataFetched: false }).catch(() => {})
 const pctOf = b => Math.round((b.progress || 0) * 100)
-const badgeFor = b => { const p = pctOf(b); return p >= 100 ? 'done ✓' : p > 0 ? p + '%' : b.progress > 0 ? 'just started' : formatLabel(b.format) }
+const badgeFor = b => { const p = pctOf(b); return p >= 100 ? 'done' : p > 0 ? p + '%' : b.progress > 0 ? 'just started' : formatLabel(b.format) }
 
 
 const render = () => {
@@ -69,7 +69,7 @@ const render = () => {
     renderStats()
 
     grid.textContent = ''
-    if (!list.length && books.length) { const d = document.createElement('p'); d.className = 'muted'; d.textContent = q || activeTag ? 'nothing matches.' : 'everything here is finished 🎉'; grid.append(d) }
+    if (!list.length && books.length) { const d = document.createElement('p'); d.className = 'muted'; d.textContent = q || activeTag ? 'nothing matches.' : 'everything here is finished'; grid.append(d) }
     for (const b of list) grid.append(makeCard(b))
     empty.hidden = books.length > 0
     library.usage().then(u => { $('#storage').textContent = books.length && u && u.quota ? `${fmtSize(u.used)} of books · ${fmtSize(u.quota - u.used)} free` : '' })
@@ -87,14 +87,14 @@ const renderStats = async () => {
     $('#st-week').textContent = fmtMin(st.weekSeconds)
     $('#st-streak').textContent = String(st.streak)
     const stickers = []
-    if (st.streak >= 30) stickers.push(['pink', '30-day streak 🔥🔥'])
-    else if (st.streak >= 7) stickers.push(['pink', 'week streak 🔥'])
-    else if (st.streak >= 3) stickers.push(['sun', '3-day streak 🔥'])
-    if (st.todaySeconds >= 1800) stickers.push(['lime', '30 min today 💪'])
-    else if (st.todaySeconds >= 600) stickers.push(['lime', '10 min today ✨'])
-    if (finished >= 10) stickers.push(['blue', `${finished} books finished 🏆`])
-    else if (finished >= 1) stickers.push(['blue', finished === 1 ? 'first finish 🎉' : `${finished} finished 🎉`])
-    if (st.totalSeconds >= 36000) stickers.push(['lilac', '10 hours read 📚'])
+    if (st.streak >= 30) stickers.push(['pink', '30-day streak'])
+    else if (st.streak >= 7) stickers.push(['pink', 'week streak'])
+    else if (st.streak >= 3) stickers.push(['sun', '3-day streak'])
+    if (st.todaySeconds >= 1800) stickers.push(['lime', '30 min today'])
+    else if (st.todaySeconds >= 600) stickers.push(['lime', '10 min today'])
+    if (finished >= 10) stickers.push(['blue', `${finished} books finished`])
+    else if (finished >= 1) stickers.push(['blue', finished === 1 ? 'first finish' : `${finished} finished`])
+    if (st.totalSeconds >= 36000) stickers.push(['lilac', '10 hours read'])
     if (st.pagesToday >= 50) stickers.push(['lilac', `${st.pagesToday} pages today`])
     $('#st-stickers').innerHTML = stickers.map(([c, t]) => `<span class="${c}">${t}</span>`).join('')
 }
@@ -144,10 +144,10 @@ $('#sheet').addEventListener('click', async e => {
         const v = prompt('tags, comma separated (e.g. sci-fi, to read):', (b.tags || []).join(', '))
         if (v !== null) { const tags = [...new Set(v.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))]; await library.update(b.id, { tags }); await reload(); toast(tags.length ? 'tagged ✓' : 'tags cleared') }
     }
-    else if (act === 'finished') { await library.update(b.id, isFinished(b) ? { finishedAt: null, progress: Math.min(b.progress || 0, 0.97) } : { finishedAt: Date.now() }); await reload(); toast(isFinished(b) ? 'back on the shelf' : 'finished 🎉') }
+    else if (act === 'finished') { await library.update(b.id, isFinished(b) ? { finishedAt: null, progress: Math.min(b.progress || 0, 0.97) } : { finishedAt: Date.now() }); await reload(); toast(isFinished(b) ? 'back on the shelf' : 'finished!') }
     else if (act === 'details') alert(`${b.title}\n${b.author || 'Unknown author'}\n${formatLabel(b.format)} · ${fmtSize(b.size)}\n${b.progressLabel || 'Not started'} (${pctOf(b)}%)\nAdded ${new Date(b.addedAt).toLocaleString()}${b.sourceUrl ? '\n' + b.sourceUrl : ''}`)
     else if (act === 'delete') {
-        if (confirm(`remove “${b.title}” from your shelf?`)) { await library.remove(b.id); urls.delete(b.id); await reload(); toast('gone 👋') }
+        if (confirm(`remove “${b.title}” from your shelf?`)) { await library.remove(b.id); urls.delete(b.id); await reload(); toast('gone') }
     }
     hideSheet()
 })
@@ -164,7 +164,7 @@ const importFiles = async files => {
     busy(false)
     await reload()
     if (failed.length) toast(`couldn’t add: ${failed.join(', ')}`, 4000)
-    else toast(ok === 1 ? 'on the shelf ✨' : `${ok} books on the shelf ✨`)
+    else toast(ok === 1 ? 'on the shelf' : `${ok} books on the shelf`)
     if (ok) library.persist()
 }
 
@@ -212,7 +212,7 @@ $('#restore-input').addEventListener('change', async () => {
         const { restoreBackup } = await import('./reader/backup.js')
         const r = await restoreBackup(f)
         await reload()
-        toast(`restored: ${r.added} new, ${r.updated} merged ✨`, 4000)
+        toast(`restored: ${r.added} new, ${r.updated} merged`, 4000)
     } catch (e) { console.error(e); toast('restore failed: ' + e.message, 4000) } finally { busy(false) }
 })
 window.dogearBackup = { backup, restore: f => import('./reader/backup.js').then(m => m.restoreBackup(f)) }
@@ -270,7 +270,7 @@ const addFromUrl = async () => {
         if (m) name = decodeURIComponent(m[1])
         if (!detectFormat(name, blob.type)) throw new Error('Unsupported file type')
         await library.importFile(new File([blob], name, { type: blob.type }), url)
-        await reload(); toast('on the shelf ✨'); library.persist()
+        await reload(); toast('on the shelf'); library.persist()
     } catch (e) {
         console.error(e)
         toast(e.name === 'TypeError' ? 'That site blocks downloads from web apps. Save the file in Safari first, then add it from Files.' : `Download failed: ${e.message}`, 5000)
@@ -280,7 +280,7 @@ const addFromUrl = async () => {
 // Files shared to Dogear (Android share target) arrive via the service worker with ?shared=N
 {
     const n = +new URLSearchParams(location.search).get('shared')
-    if (n > 0) { history.replaceState(null, '', location.pathname); setTimeout(() => toast(n === 1 ? 'shared book added ✨' : `${n} shared books added ✨`), 400) }
+    if (n > 0) { history.replaceState(null, '', location.pathname); setTimeout(() => toast(n === 1 ? 'shared book added' : `${n} shared books added`), 400) }
 }
 
 document.addEventListener('dragover', e => e.preventDefault())

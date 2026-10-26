@@ -18,18 +18,25 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
+<svg hidden aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></symbol>
+  <symbol id="i-backup" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
+  <symbol id="i-restore" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></symbol>
+  <symbol id="i-tips" viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></symbol>
+</svg>
 <div class="blobs" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
 
 <header class="top">
   <div class="brand">
     <svg class="mascot" viewBox="0 0 64 64" aria-hidden="true">
-      <path class="m-page" d="M16 8h22l10 10v34a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"/>
-      <path class="m-shade" d="M38 8v7a3 3 0 0 0 3 3h7z" opacity="0.18"/>
-      <path class="m-fold" d="M38 8v7a3 3 0 0 0 3 3h7z"/>
-      <ellipse class="m-eye" cx="25" cy="32" rx="2.5" ry="2.9"/><ellipse class="m-eye" cx="36" cy="32" rx="2.5" ry="2.9"/>
-      <circle class="m-glint" cx="25.9" cy="31" r="0.9"/><circle class="m-glint" cx="36.9" cy="31" r="0.9"/>
-      <path class="m-smile" d="M25 40.5q5.5 5.5 11 0"/>
-      <ellipse class="m-blush" cx="20.2" cy="37.6" rx="2.4" ry="1.5"/><ellipse class="m-blush" cx="40.8" cy="37.6" rx="2.4" ry="1.5"/>
+      <path class="m-page" d="M18 8h22l10 10v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"/>
+      <path class="m-shade" d="M40 8v7a3 3 0 0 0 3 3h7z" opacity="0.18"/>
+      <path class="m-fold" d="M40 8v7a3 3 0 0 0 3 3h7z"/>
+      <ellipse class="m-eye" cx="27" cy="32" rx="2.5" ry="2.9"/><ellipse class="m-eye" cx="38" cy="32" rx="2.5" ry="2.9"/>
+      <circle class="m-glint" cx="27.9" cy="31" r="0.9"/><circle class="m-glint" cx="38.9" cy="31" r="0.9"/>
+      <path class="m-smile" d="M27 40.5q5.5 5.5 11 0"/>
+      <ellipse class="m-blush" cx="22.2" cy="37.6" rx="2.4" ry="1.5"/><ellipse class="m-blush" cx="42.8" cy="37.6" rx="2.4" ry="1.5"/>
     </svg>
     <div>
       <h1><span class="hl">Dogear</span></h1>
@@ -99,13 +106,13 @@
 
   <div id="empty" class="empty" hidden>
     <svg class="mascot empty-art" viewBox="0 0 64 64" aria-hidden="true">
-      <path class="m-page" d="M16 8h22l10 10v34a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"/>
-      <path class="m-shade" d="M38 8v7a3 3 0 0 0 3 3h7z" opacity="0.18"/>
-      <path class="m-fold" d="M38 8v7a3 3 0 0 0 3 3h7z"/>
-      <ellipse class="m-eye" cx="25" cy="32" rx="2.5" ry="2.9"/><ellipse class="m-eye" cx="36" cy="32" rx="2.5" ry="2.9"/>
-      <circle class="m-glint" cx="25.9" cy="31" r="0.9"/><circle class="m-glint" cx="36.9" cy="31" r="0.9"/>
-      <path class="m-smile" d="M25 40.5q5.5 5.5 11 0"/>
-      <ellipse class="m-blush" cx="20.2" cy="37.6" rx="2.4" ry="1.5"/><ellipse class="m-blush" cx="40.8" cy="37.6" rx="2.4" ry="1.5"/>
+      <path class="m-page" d="M18 8h22l10 10v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"/>
+      <path class="m-shade" d="M40 8v7a3 3 0 0 0 3 3h7z" opacity="0.18"/>
+      <path class="m-fold" d="M40 8v7a3 3 0 0 0 3 3h7z"/>
+      <ellipse class="m-eye" cx="27" cy="32" rx="2.5" ry="2.9"/><ellipse class="m-eye" cx="38" cy="32" rx="2.5" ry="2.9"/>
+      <circle class="m-glint" cx="27.9" cy="31" r="0.9"/><circle class="m-glint" cx="38.9" cy="31" r="0.9"/>
+      <path class="m-smile" d="M27 40.5q5.5 5.5 11 0"/>
+      <ellipse class="m-blush" cx="22.2" cy="37.6" rx="2.4" ry="1.5"/><ellipse class="m-blush" cx="42.8" cy="37.6" rx="2.4" ry="1.5"/>
     </svg>
     <h2>nothing here yet</h2>
     <p class="muted">tap <strong>add books</strong>, or <button id="empty-find" class="link">find free books</button>.</p>
@@ -121,11 +128,11 @@
 <div id="more" class="sheet" hidden>
   <div class="grab"></div>
   <div class="sheet-title">more</div>
-  <button class="sheet-btn" data-more="find">🔎 find free books</button>
-  <button class="sheet-btn" data-more="url">🔗 add from a link</button>
-  <button class="sheet-btn" data-more="backup">💾 back up shelf</button>
-  <button class="sheet-btn" data-more="restore">📥 restore a backup</button>
-  <button class="sheet-btn" data-more="help">💡 tips &amp; shortcuts</button>
+  <button class="sheet-btn" data-more="find"><i class="mi c-blue"><svg><use href="#i-search"/></svg></i>find free books</button>
+  <button class="sheet-btn" data-more="url"><i class="mi c-lilac"><svg><use href="#i-link"/></svg></i>add from a link</button>
+  <button class="sheet-btn" data-more="backup"><i class="mi c-lime"><svg><use href="#i-backup"/></svg></i>back up shelf</button>
+  <button class="sheet-btn" data-more="restore"><i class="mi c-sun"><svg><use href="#i-restore"/></svg></i>restore a backup</button>
+  <button class="sheet-btn" data-more="help"><i class="mi c-pink"><svg><use href="#i-tips"/></svg></i>tips &amp; shortcuts</button>
   <button class="sheet-btn" data-more="cancel">never mind</button>
 </div>
 <input id="restore-input" type="file" accept=".zip,application/zip" hidden>

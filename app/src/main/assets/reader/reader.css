@@ -233,3 +233,6 @@ body[data-theme="gray"] .dict-title h2, body[data-theme="dark"] .dict-title h2 {
 .chip.preset { background: var(--card); }
 .tr-src { color: var(--muted); font-size: 14px; margin: 6px 0 4px; }
 .tr-out { font-family: var(--display); font-weight: 700; font-size: 20px; line-height: 1.3; margin: 0 0 8px; font-variation-settings: 'opsz' 40, 'wdth' 92; }
+.chip.preset { display: inline-flex; align-items: center; gap: 6px; }
+.chip.preset svg { width: 16px; height: 16px; fill: currentColor; }
+.chip.preset[data-preset="cosy"] svg { color: var(--tang); } .chip.preset[data-preset="focus"] svg { color: var(--blue); } .chip.preset[data-preset="night"] svg { color: var(--lilac); }
