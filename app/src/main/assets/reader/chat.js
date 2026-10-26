@@ -1,22 +1,41 @@
-// Talk to Lumi about the book. Bring-your-own-key: the reader pastes their own Claude API key, which stays on this
-// device (localStorage) and is sent straight to api.anthropic.com. Lumi only ever sees the text up to where the
-// reader is, so she can't spoil what comes next.
+// Talk to Lumi about the book. Bring-your-own-key: the reader pastes their own Claude or OpenAI API key, which stays
+// on this device (localStorage) and is sent straight to that provider. Lumi only ever sees the text up to where the
+// reader is, so she can't spoil what comes next. The provider is switchable at any time; the conversation is shared.
 import { lumiHTML, setPose } from './companion.js'
 
-const API = 'https://api.anthropic.com/v1/messages'
-const VERSION = '2026-10-21'
-const KEY = 'lumi.chat.key', MODEL = 'lumi.chat.model', HIST = 'lumi.chat.h.'
-const EXCERPT_LIMIT = 9000
-export const MODELS = [
-    { id: 'claude-opus-5-5', name: 'Opus 5.5', note: 'sharpest' },
-    { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5', note: 'balanced' },
-    { id: 'claude-haiku-5-5', name: 'Haiku 5.5', note: 'fastest, cheapest' },
-]
+const ANTHROPIC_VERSION = '2026-10-21'
+const HIST = 'lumi.chat.h.', PROVIDER = 'lumi.chat.provider'
+export const PROVIDERS = {
+    claude: {
+        name: 'Claude', url: 'https://api.anthropic.com/v1/messages', link: 'https://platform.claude.com', placeholder: 'sk-ant-…',
+        keyOk: k => /^sk-ant-/.test(k), keyStore: 'lumi.chat.key', modelStore: 'lumi.chat.model',
+        models: [
+            { id: 'claude-opus-5-5', name: 'Opus 5.5', note: 'sharpest' },
+            { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5', note: 'balanced' },
+            { id: 'claude-haiku-5-5', name: 'Haiku 5.5', note: 'fastest, cheapest' },
+        ],
+    },
+    openai: {
+        name: 'OpenAI', url: 'https://api.openai.com/v1/chat/completions', link: 'https://platform.openai.com/api-keys', placeholder: 'sk-…',
+        keyOk: k => /^sk-/.test(k) && !/^sk-ant-/.test(k), keyStore: 'lumi.chat.key.openai', modelStore: 'lumi.chat.model.openai',
+        models: [
+            { id: 'gpt-6-astra', name: 'GPT-6 Astra', note: 'sharpest' },
+            { id: 'gpt-6.1-sol', name: 'GPT-6.1 Sol', note: 'balanced' },
+            { id: 'gpt-6-luna', name: 'GPT-6 Luna', note: 'fastest, cheapest' },
+        ],
+    },
+}
+export const MODELS = PROVIDERS.claude.models
 const ls = { get: k => { try { return localStorage.getItem(k) } catch { return null } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v) } catch { /* ignore */ } } }
 
 export const chatConfig = {
-    get key() { return ls.get(KEY) || '' }, set key(v) { ls.set(KEY, v ? v.trim() : null) },
-    get model() { return MODELS.some(m => m.id === ls.get(MODEL)) ? ls.get(MODEL) : MODELS[0].id }, set model(v) { ls.set(MODEL, v) },
+    get provider() { return PROVIDERS[ls.get(PROVIDER)] ? ls.get(PROVIDER) : 'claude' }, set provider(v) { ls.set(PROVIDER, PROVIDERS[v] ? v : null) },
+    get spec() { return PROVIDERS[this.provider] },
+    keyFor(p) { return ls.get(PROVIDERS[p].keyStore) || '' },
+    setKey(p, v) { ls.set(PROVIDERS[p].keyStore, v ? v.trim() : null) },
+    get key() { return this.keyFor(this.provider) }, set key(v) { this.setKey(this.provider, v) },
+    get model() { const { models, modelStore } = this.spec; const v = ls.get(modelStore); return models.some(m => m.id === v) ? v : models[0].id },
+    set model(v) { ls.set(this.spec.modelStore, v) },
     history(bookId) { try { return JSON.parse(ls.get(HIST + bookId) || '[]') } catch { return [] } },
     saveHistory(bookId, msgs) { ls.set(HIST + bookId, msgs.length ? JSON.stringify(msgs.slice(-40)) : null) },
 }
@@ -43,25 +62,10 @@ export const persona = ({ title, author, fraction = 0, chapter = '', excerpt = '
     return parts.filter(Boolean).join('\n\n')
 }
 
-/** Streams one reply from Claude. Yields { text } deltas and finally { stop } with the stop reason. */
-export async function* stream({ key, model, system, messages, signal, fetchFn = fetch }) {
-    const headers = {
-        'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': VERSION,
-        'anthropic-dangerous-direct-browser-access': 'true',
-    }
-    const body = {
-        model, max_tokens: 1024, stream: true,
-        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-        messages, output_config: { effort: 'low' },
-    }
-    // a safety-classifier decline is re-run server-side on the model Anthropic recommends (not offered for Haiku)
-    if (!model.includes('haiku')) { body.fallbacks = 'default'; headers['anthropic-beta'] = 'server-side-fallback-2026-07-01' }
-    const res = await fetchFn(API, { method: 'POST', headers, body: JSON.stringify(body), signal })
-    if (!res.ok) {
-        let msg = ''
-        try { msg = (await res.json()).error?.message || '' } catch { /* ignore */ }
-        throw new ChatError(res.status, msg)
-    }
+/** Streams one reply. Yields { text } deltas and finally { stop } with a stop reason ('end_turn' | 'refusal' | …). */
+export function stream(opts) { return (opts.provider === 'openai' ? streamOpenAI : streamClaude)(opts) }
+
+const readSSE = async function* (res) {
     const reader = res.body.getReader(), dec = new TextDecoder()
     let buf = ''
     for (;;) {
@@ -73,12 +77,51 @@ export async function* stream({ key, model, system, messages, signal, fetchFn = 
             const chunk = buf.slice(0, i); buf = buf.slice(i + 2)
             for (const line of chunk.split('\n')) {
                 if (!line.startsWith('data:')) continue
-                let ev; try { ev = JSON.parse(line.slice(5).trim()) } catch { continue }
-                if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') yield { text: ev.delta.text }
-                else if (ev.type === 'message_delta' && ev.delta?.stop_reason) yield { stop: ev.delta.stop_reason }
-                else if (ev.type === 'error') throw new ChatError(0, ev.error?.message)
+                const data = line.slice(5).trim()
+                if (data === '[DONE]') return
+                let ev; try { ev = JSON.parse(data) } catch { continue }
+                yield ev
             }
         }
+    }
+}
+const fail = async res => { let msg = ''; try { msg = (await res.json()).error?.message || '' } catch { /* ignore */ } throw new ChatError(res.status, msg) }
+
+export async function* streamClaude({ key, model, system, messages, signal, fetchFn = fetch }) {
+    const headers = {
+        'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': ANTHROPIC_VERSION,
+        'anthropic-dangerous-direct-browser-access': 'true',
+    }
+    const body = {
+        model, max_tokens: 1024, stream: true,
+        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+        messages, output_config: { effort: 'low' },
+    }
+    // a safety-classifier decline is re-run server-side on the model Anthropic recommends (not offered for Haiku)
+    if (!model.includes('haiku')) { body.fallbacks = 'default'; headers['anthropic-beta'] = 'server-side-fallback-2026-07-01' }
+    const res = await fetchFn(PROVIDERS.claude.url, { method: 'POST', headers, body: JSON.stringify(body), signal })
+    if (!res.ok) await fail(res)
+    for await (const ev of readSSE(res)) {
+        if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') yield { text: ev.delta.text }
+        else if (ev.type === 'message_delta' && ev.delta?.stop_reason) yield { stop: ev.delta.stop_reason }
+        else if (ev.type === 'error') throw new ChatError(0, ev.error?.message)
+    }
+}
+
+// OpenAI Chat Completions: the persona goes in as a system message; deltas arrive as choices[0].delta.content.
+export async function* streamOpenAI({ key, model, system, messages, signal, fetchFn = fetch }) {
+    const headers = { 'content-type': 'application/json', authorization: `Bearer ${key}` }
+    const body = {
+        model, stream: true, max_completion_tokens: 1024, reasoning_effort: 'low',
+        messages: [{ role: 'system', content: system }, ...messages],
+    }
+    const res = await fetchFn(PROVIDERS.openai.url, { method: 'POST', headers, body: JSON.stringify(body), signal })
+    if (!res.ok) await fail(res)
+    for await (const ev of readSSE(res)) {
+        if (ev.error) throw new ChatError(0, ev.error.message)
+        const c = ev.choices?.[0]
+        if (c?.delta?.content) yield { text: c.delta.content }
+        if (c?.finish_reason) yield { stop: c.finish_reason === 'content_filter' ? 'refusal' : c.finish_reason === 'length' ? 'max_tokens' : 'end_turn' }
     }
 }
 
@@ -88,9 +131,9 @@ const friendly = e => {
     if (e.name === 'AbortError') return ''
     if (e.status === 401) return 'that key didn’t work. check it in settings?'
     if (e.status === 403) return 'that key isn’t allowed to do this.'
-    if (e.status === 429) return 'too many questions at once, give it a moment.'
+    if (e.status === 429) return /quota|billing|credit/i.test(e.message) ? 'that key is out of credits.' : 'too many questions at once, give it a moment.'
     if (e.status === 529 || e.status === 503) return 'claude is busy right now, try again in a bit.'
-    if (e.status === 0 || e instanceof TypeError) return 'can’t reach claude. are you online?'
+    if (e.status === 0 || e instanceof TypeError) return `can’t reach ${chatConfig.spec.name.toLowerCase()}. are you online?`
     return e.message ? `hmm: ${e.message}` : 'something went wrong.'
 }
 const squash = s => String(s ?? '').replace(/[ \t ]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim()
@@ -115,9 +158,10 @@ export class LumiChat {
         this.q('#chat-key-save').addEventListener('click', () => this.#saveSetup())
         this.q('#chat-key').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this.#saveSetup() } })
         this.q('#chat-key-forget').addEventListener('click', () => { chatConfig.key = null; this.toast?.('key forgotten'); this.render(); this.showSetup(true) })
+        this.q('#chat-providers').innerHTML = Object.entries(PROVIDERS).map(([id, p]) => `<button type="button" class="chip" data-provider="${id}">${p.name}</button>`).join('')
+        this.q('#chat-providers').addEventListener('click', e => { const b = e.target.closest('[data-provider]'); if (b) { chatConfig.provider = b.dataset.provider; this.#syncProvider(); this.render() } })
         this.q('#chat-clear').addEventListener('click', () => this.clear())
         this.q('#chat-key-link').addEventListener('click', e => { e.preventDefault(); (opts.openExternal || (u => window.open(u, '_blank')))(e.currentTarget.href) })
-        this.q('#chat-models').innerHTML = MODELS.map(m => `<button type="button" class="chip" data-model="${m.id}">${m.name}<small>${m.note}</small></button>`).join('')
         this.q('#chat-models').addEventListener('click', e => { const b = e.target.closest('[data-model]'); if (b) { chatConfig.model = b.dataset.model; this.#syncModels() } })
         this.q('#chat-quote-x').addEventListener('click', () => this.setQuote(null))
         this.log.addEventListener('click', e => { const r = e.target.closest('[data-retry]'); if (r) { this.input.value = r.dataset.retry; r.closest('.msg').remove(); this.send(this.input.value) } })
@@ -140,15 +184,25 @@ export class LumiChat {
     }
     showSetup(v) {
         this.setup.hidden = !v
-        if (v) { this.q('#chat-key').value = chatConfig.key; this.#syncModels(); this.q('#chat-key-forget').hidden = !this.ready; if (!this.ready) setTimeout(() => this.q('#chat-key').focus({ preventScroll: true }), 350) }
+        if (v) { this.#syncProvider(); if (!this.ready) setTimeout(() => this.q('#chat-key').focus({ preventScroll: true }), 350) }
         this.q('#chat-form').classList.toggle('dim', v)
+    }
+    #syncProvider() {
+        const spec = chatConfig.spec
+        for (const b of this.q('#chat-providers').children) b.classList.toggle('active', b.dataset.provider === chatConfig.provider)
+        this.q('#chat-models').innerHTML = spec.models.map(m => `<button type="button" class="chip" data-model="${m.id}">${m.name}<small>${m.note}</small></button>`).join('')
+        this.#syncModels()
+        const key = this.q('#chat-key'); key.value = chatConfig.key; key.placeholder = spec.placeholder
+        this.q('#chat-key-link').href = spec.link
+        this.q('#chat-key-forget').hidden = !this.ready
+        this.q('.chat-head .sub').textContent = `about this book · no spoilers${this.ready ? ' · ' + spec.name.toLowerCase() : ''}`
     }
     #syncModels() { for (const b of this.q('#chat-models').children) b.classList.toggle('active', b.dataset.model === chatConfig.model) }
     #saveSetup() {
         const k = this.q('#chat-key').value.trim()
         if (!k) { this.toast?.('paste a key first'); return }
-        if (!/^sk-ant-/.test(k)) { this.toast?.('that doesn’t look like a claude api key'); return }
-        chatConfig.key = k; this.showSetup(false); this.render(); this.toast?.('key saved on this device')
+        if (!chatConfig.spec.keyOk(k)) { this.toast?.(`that doesn’t look like a${chatConfig.provider === 'openai' ? 'n openai' : ' claude'} api key`); return }
+        chatConfig.key = k; this.#syncProvider(); this.showSetup(false); this.render(); this.toast?.('key saved on this device')
         setTimeout(() => this.input.focus({ preventScroll: true }), 100)
     }
     clear() {
@@ -199,7 +253,7 @@ export class LumiChat {
             const ctx = await this.opts.getContext()
             const system = persona(ctx)
             const history = [...this.messages.slice(-20), { role: 'user', content }]
-            for await (const ev of stream({ key: chatConfig.key, model: chatConfig.model, system, messages: history, signal: this.abort.signal })) {
+            for await (const ev of stream({ provider: chatConfig.provider, key: chatConfig.key, model: chatConfig.model, system, messages: history, signal: this.abort.signal })) {
                 if (ev.text) { out += ev.text; reply.classList.remove('typing'); this.#fill(reply, out); this.#scroll() }
                 if (ev.stop) stop = ev.stop
             }
