@@ -163,13 +163,44 @@ $('#sheet').addEventListener('click', async e => {
         const v = prompt('tags, comma separated (e.g. sci-fi, to read):', (b.tags || []).join(', '))
         if (v !== null) { const tags = [...new Set(v.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))]; await library.update(b.id, { tags }); await reload(); toast(tags.length ? 'tagged ✓' : 'tags cleared') }
     }
-    else if (act === 'finished') { await library.update(b.id, isFinished(b) ? { finishedAt: null, progress: Math.min(b.progress || 0, 0.97) } : { finishedAt: Date.now() }); await reload(); toast(isFinished(b) ? 'back on the shelf' : 'finished!') }
+    else if (act === 'finished') { await library.update(b.id, isFinished(b) ? { finishedAt: null, progress: Math.min(b.progress || 0, 0.97) } : { finishedAt: Date.now() }); await reload(); toast(isFinished(b) ? 'back on the shelf' : 'finished!'); if (!isFinished(b)) mascot.act('excited') }
     else if (act === 'details') alert(`${b.title}\n${b.author || 'Unknown author'}\n${formatLabel(b.format)} · ${fmtSize(b.size)}\n${b.progressLabel || 'Not started'} (${pctOf(b)}%)\n${timeLine(b) || 'No reading time yet'}\nAdded ${new Date(b.addedAt).toLocaleString()}${b.sourceUrl ? '\n' + b.sourceUrl : ''}`)
     else if (act === 'delete') {
         if (confirm(`remove “${b.title}” from your shelf?`)) { await library.remove(b.id); urls.delete(b.id); await reload(); toast('gone') }
     }
     hideSheet()
 })
+
+// ---- the header mascot's idle life: one small act every few seconds, naps when you've been away ----
+const mascotLife = () => {
+    const m = $('.top .mascot')
+    if (!m || matchMedia('(prefers-reduced-motion: reduce)').matches) return { act: () => {} }
+    const ACTS = [['blink', 320, 6], ['dblblink', 600, 2], ['look-left', 1100, 2], ['look-right', 1100, 2], ['look-up', 900, 1], ['happy', 1500, 2], ['wink', 600, 1], ['surprised', 1000, 1], ['flap', 900, 3], ['wiggle', 700, 1], ['bounce', 700, 1]]
+    let busy = null, lastTouch = Date.now(), asleep = false
+    const clear = () => { if (busy) { clearTimeout(busy.t); m.classList.remove('is-' + busy.name); busy = null } }
+    const act = (name, ms, force = false) => {
+        if (busy && !force) return
+        if (force) clear()
+        if (asleep) wake()
+        m.classList.add('is-' + name)
+        busy = { name, t: setTimeout(() => { m.classList.remove('is-' + name); busy = null }, ms) }
+    }
+    const pick = () => { let r = Math.random() * ACTS.reduce((a, x) => a + x[2], 0); return ACTS.find(x => (r -= x[2]) < 0) || ACTS[0] }
+    const nap = () => { asleep = true; m.classList.add('is-sleepy') }
+    const wake = () => { if (!asleep) return; asleep = false; m.classList.remove('is-sleepy'); act('surprised', 900, true) }
+    const tick = () => {
+        if (document.visibilityState === 'visible') {
+            if (!asleep && Date.now() - lastTouch > 60000) nap()
+            else if (!asleep) { const [name, ms] = pick(); act(name, ms) }
+        }
+        setTimeout(tick, 1800 + Math.random() * 3400)
+    }
+    setTimeout(tick, 1500)
+    document.addEventListener('pointerdown', () => { lastTouch = Date.now(); if (asleep) wake() }, { passive: true })
+    m.addEventListener('click', () => act(Math.random() < 0.25 ? 'wink' : 'excited', 1200, true))
+    return { act: (name = 'excited', ms = 1200) => act(name, ms, true) }
+}
+const mascot = mascotLife()
 
 const reload = async () => { books = await library.all(); allSessions = await sessions.all().catch(() => []); words = await vocab.all().catch(() => []); render() }
 
@@ -183,7 +214,7 @@ const importFiles = async files => {
     busy(false)
     await reload()
     if (failed.length) toast(`couldn’t add: ${failed.join(', ')}`, 4000)
-    else toast(ok === 1 ? 'on the shelf' : `${ok} books on the shelf`)
+    else { toast(ok === 1 ? 'on the shelf' : `${ok} books on the shelf`); mascot.act('excited') }
     if (ok) library.persist()
 }
 
