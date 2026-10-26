@@ -40,7 +40,7 @@ export class Companion {
         this.lastSaid = 0; this.lastReact = 0; this.pages = 0; this.chapter = null; this.lastPageAt = Date.now(); this.sessionSeconds = 0
         this.saidLong = new Set(); this.saidLate = false; this.greeted = false; this.asleep = false; this.listening = false
         this.figure.addEventListener('click', e => { e.stopPropagation(); this.tap() })
-        this.bubble.addEventListener('click', () => this.hush())
+        this.bubble.addEventListener('click', e => { e.stopPropagation(); if (this.onTap) this.openChat(); else this.hush() })
         root.hidden = !enabled
         this.timer = setInterval(() => this.#idleCheck(), 30000)
     }
@@ -86,7 +86,7 @@ export class Companion {
         if (!this.onTap) return
         let seen = false; try { seen = !!localStorage.getItem('lumi.chat.hinted') } catch { /* ignore */ }
         if (seen) return
-        setTimeout(() => { if (this.enabled && !this.root.classList.contains('tucked') && this.say('tap me anytime to chat about the book.', 4500)) { try { localStorage.setItem('lumi.chat.hinted', '1') } catch { /* ignore */ } } }, delay)
+        setTimeout(() => { if (this.enabled && !this.root.classList.contains('tucked') && this.say('tap me twice to chat about the book.', 4500)) { try { localStorage.setItem('lumi.chat.hinted', '1') } catch { /* ignore */ } } }, delay)
     }
     react(kind, data = {}) {
         if (!this.enabled) return
@@ -114,12 +114,15 @@ export class Companion {
             case 'visible': if (data.on) { this.lastPageAt = Date.now() } break
         }
     }
+    // One tap: a quick word and a hop. A second tap while she is still talking (or a tap on the bubble) opens the chat.
     tap() {
         if (!this.enabled) return
-        // with a chat wired up, a tap is a knock: wake up if needed, hop, and open the conversation right away
-        if (this.onTap) { this.asleep = false; this.hush(); this.pose('happy', 1800); this.hop(); this.onTap(); return }
-        if (this.asleep || this.late) { this.say(pick(LINES.tapSleepy), 2500); if (this.asleep) this.#wakeIfNeeded(); return }
-        this.pose('happy', 1800); this.hop(); this.say(pick(LINES.tap), 2200)
+        const now = Date.now()
+        if (this.onTap && now - (this.lastTap || 0) < 3500) { this.openChat(); return }
+        this.lastTap = now
+        if (this.asleep || this.late) { if (this.asleep) { this.asleep = false; this.pose(this.baseline) } this.say(pick(LINES.tapSleepy), 3000); return }
+        this.pose('happy', 1800); this.hop(); this.say(pick(LINES.tap), 3000)
     }
+    openChat() { if (!this.onTap) return; this.lastTap = 0; this.asleep = false; this.hush(); this.pose('happy', 1800); this.hop(); this.onTap() }
     destroy() { clearInterval(this.timer) }
 }
