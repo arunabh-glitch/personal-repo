@@ -1,6 +1,6 @@
 {
-  "name": "Dogear",
-  "short_name": "Dogear",
+  "name": "Otto",
+  "short_name": "Otto",
   "description": "A cosy reader for EPUB, PDF, MOBI, FB2, CBZ and text, with a built-in dictionary.",
   "start_url": "./index.html",
   "scope": "./",

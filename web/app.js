@@ -323,7 +323,7 @@ const backup = async () => {
         const blob = await createBackup()
         const a = document.createElement('a')
         a.href = URL.createObjectURL(blob)
-        a.download = `dogear-backup-${new Date().toISOString().slice(0, 10)}.zip`
+        a.download = `otto-backup-${new Date().toISOString().slice(0, 10)}.zip`
         document.body.append(a); a.click(); a.remove()
         setTimeout(() => URL.revokeObjectURL(a.href), 60000)
         toast(`backup ready (${fmtSize(blob.size)}) — save it to Files or Drive`, 4000)
@@ -402,7 +402,7 @@ const addFromUrl = async () => {
     } finally { busy(false) }
 }
 
-// Files shared to Dogear (Android share target) arrive via the service worker with ?shared=N
+// Files shared to Otto (Android share target) arrive via the service worker with ?shared=N
 {
     const n = +new URLSearchParams(location.search).get('shared')
     if (n > 0) { history.replaceState(null, '', location.pathname); setTimeout(() => toast(n === 1 ? 'shared book added' : `${n} shared books added`), 400) }
