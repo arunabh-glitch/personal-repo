@@ -96,9 +96,9 @@ const renderStats = () => {
     // streak card
     $('#st-streak').textContent = String(st.streak)
     $('#st-streak-label').textContent = st.streak === 1 ? 'day streak' : 'day streak'
-    const best = $('#st-best'); best.hidden = !(st.bestStreak >= 2 && st.bestStreak > st.streak); best.textContent = `best ${st.bestStreak}`
+    $('#st-best').textContent = String(st.bestStreak)
     const flame = $('.flame'); flame.classList.toggle('lit', st.todayDone); flame.classList.toggle('cold', !st.todayDone && st.streak === 0)
-    $('#st-days').innerHTML = st.days.map(d => `<span class="day${d.read ? ' read' : ''}${d.today ? ' today' : ''}" title="${fmtMin(d.seconds)}"><i></i><b>${'SMTWTFS'[new Date(d.ts).getDay()]}</b></span>`).join('')
+    $('#st-days').innerHTML = st.days.map(d => `<i class="day${d.read ? ' read' : ''}${d.today ? ' today' : ''}" title="${'SMTWTFS'[new Date(d.ts).getDay()]} · ${fmtMin(d.seconds)}"></i>`).join('')
     $('#st-nudge').textContent = st.todayDone
         ? (st.streak >= 2 ? `${st.streak} days in a row. keep it rolling.` : 'today’s reading is in. nice.')
         : st.streak > 0 ? 'two minutes today keeps the streak alive.' : 'read for two minutes today to start a streak.'
@@ -238,6 +238,7 @@ $('#words-list').addEventListener('click', async e => {
     if (btn.dataset.wact === 'remove') { await vocab.remove(id); words = words.filter(x => x.id !== id); renderWords(); renderStats(); toast('removed') }
 })
 $('#words-close').addEventListener('click', () => { $('#words').hidden = true; renderStats() })
+$('#stats-strip').addEventListener('click', () => { const more = $('#stats-more'); more.hidden = !more.hidden; $('#stats-strip').setAttribute('aria-expanded', String(!more.hidden)) })
 $('#st-words').addEventListener('click', () => openWords())
 
 // flashcards

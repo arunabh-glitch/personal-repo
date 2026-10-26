@@ -85,22 +85,23 @@
   </section>
 
   <section id="stats" class="stats" hidden>
-    <div class="streak-card">
-      <div class="streak-main">
-        <i class="flame" aria-hidden="true"><svg><use href="#i-flame"/></svg></i>
-        <div class="streak-num"><b id="st-streak">0</b><span id="st-streak-label">day streak</span></div>
-        <span id="st-best" class="streak-best" hidden></span>
+    <button id="stats-strip" class="stats-strip" aria-expanded="false" aria-controls="stats-more">
+      <i class="flame" aria-hidden="true"><svg><use href="#i-flame"/></svg></i>
+      <span class="ss-streak"><b id="st-streak">0</b><span id="st-streak-label">day streak</span></span>
+      <span id="st-days" class="week-strip" aria-label="Last seven days"></span>
+      <span class="ss-today"><b id="st-today">0m</b> today</span>
+      <svg class="ss-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+    </button>
+    <div id="stats-more" class="stats-more" hidden>
+      <div class="stat-row">
+        <div class="stat"><b id="st-week">0m</b><span>this week</span></div>
+        <div class="stat"><b id="st-total">0m</b><span>all time</span></div>
+        <div class="stat"><b id="st-best">0</b><span>best streak</span></div>
+        <button class="stat words" id="st-words"><b id="st-words-n">0</b><span>words saved</span></button>
       </div>
-      <div id="st-days" class="week-strip" aria-label="Last seven days"></div>
       <p id="st-nudge" class="streak-nudge"></p>
+      <div id="st-stickers" class="stickers"></div>
     </div>
-    <div class="stat-row">
-      <div class="stat"><b id="st-today">0m</b><span>today</span></div>
-      <div class="stat"><b id="st-week">0m</b><span>this week</span></div>
-      <div class="stat"><b id="st-total">0m</b><span>all time</span></div>
-      <button class="stat words" id="st-words"><b id="st-words-n">0</b><span>words saved</span></button>
-    </div>
-    <div id="st-stickers" class="stickers"></div>
   </section>
 
   <section>
