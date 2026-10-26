@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="color-scheme" content="light dark">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' blob: 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; media-src 'self' blob: data: https://api.dictionaryapi.dev https://*.wiktionary.org https://upload.wikimedia.org; connect-src 'self' blob: data: https://api.dictionaryapi.dev https://en.wiktionary.org https://api.mymemory.translated.net https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://openshelf-reader.netlify.app; frame-src blob: data:; object-src blob: data:; worker-src 'self' blob:; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' blob: 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; media-src 'self' blob: data: https://api.dictionaryapi.dev https://*.wiktionary.org https://upload.wikimedia.org; connect-src 'self' blob: data: https://api.dictionaryapi.dev https://en.wiktionary.org https://api.mymemory.translated.net https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com; frame-src blob: data:; object-src blob: data:; worker-src 'self' blob:; form-action 'none';">
 <title>Lumi</title>
 <link rel="stylesheet" href="reader.css">
 </head>
@@ -212,9 +212,8 @@
     <button class="icon close" data-close="chat-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
   </div>
   <div id="chat-setup" class="chat-setup" hidden>
-    <p>lumi comes with her own model, nothing to set up. prefer your own Claude, Gemini or OpenAI key? it stays on this device and goes straight to that provider, and you pay for what you use. only the pages you’ve already read are sent.</p>
+    <p>lumi talks through a Claude, Gemini or OpenAI model. paste your own API key: it stays on this device and goes straight to that provider, and you pay for what you use (a free Google AI Studio key works for Gemini Flash). only the pages you’ve already read are sent.</p>
     <div id="chat-providers" class="chips seg chat-providers"></div>
-    <p id="chat-builtin" class="chat-builtin">you’re on lumi’s own model. nothing to paste.</p>
     <div class="chat-key-row"><input id="chat-key" type="password" placeholder="sk-ant-…" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Claude API key"><button id="chat-key-save" class="btn small" type="button">save</button></div>
     <div id="chat-models" class="chips"></div>
     <div class="row-inline chat-setup-foot"><a id="chat-key-link" class="link" href="https://platform.claude.com" target="_blank" rel="noopener">get a key ↗</a><button id="chat-clear" class="mini" type="button">clear this chat</button><button id="chat-key-forget" class="mini danger" type="button" hidden>forget key</button></div>

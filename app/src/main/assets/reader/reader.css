@@ -297,7 +297,6 @@ body[data-theme="light"] .lumi, body[data-theme="sepia"] .lumi { filter: drop-sh
 .chat-lumi { width: 44px; flex: none; }
 .chat-setup { margin: 0 16px 10px; padding: 12px 14px; border: 2px solid var(--line); border-radius: 18px; background: var(--paper); font-size: 13px; line-height: 1.4; }
 .chat-setup p { margin: 0 0 10px; }
-.chat-builtin { color: var(--muted); font-weight: 600; margin: 0 !important; }
 .chat-key-row { display: flex; gap: 8px; }
 .chat-key-row input { flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 9px 12px; border-radius: 999px; border: 2px solid var(--line); background: var(--card); color: var(--ink); outline: none; }
 .chat-key-row input:focus { box-shadow: 3px 3px 0 var(--blue); }

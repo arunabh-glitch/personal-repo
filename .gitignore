@@ -12,4 +12,3 @@ keystore.properties
 *.jks
 *.keystore
 dist/
-node_modules/

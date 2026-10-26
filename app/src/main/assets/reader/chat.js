@@ -1,16 +1,11 @@
-// Talk to Lumi about the book. Bring-your-own-key: the reader pastes their own Claude or OpenAI API key, which stays
-// on this device (localStorage) and is sent straight to that provider. Lumi only ever sees the text up to where the
-// reader is, so she can't spoil what comes next. The provider is switchable at any time; the conversation is shared.
+// Talk to Lumi about the book. Bring-your-own-key: the reader pastes their own Claude, Gemini or OpenAI API key, which
+// stays on this device (localStorage) and is sent straight to that provider. Lumi only ever sees the text up to where
+// the reader is, so she can't spoil what comes next. The provider is switchable at any time; the conversation is shared.
 import { lumiHTML, setPose } from './companion.js'
 
 const ANTHROPIC_VERSION = '2026-10-21'
 const HIST = 'lumi.chat.h.', PROVIDER = 'lumi.chat.provider'
-// Lumi's own model lives behind a relay on the Netlify site; from that site it is same-origin
-export const RELAY = typeof location !== 'undefined' && /(^|\.)openshelf-reader\.netlify\.app$/.test(location.hostname) ? '/api/lumi' : 'https://openshelf-reader.netlify.app/api/lumi'
 export const PROVIDERS = {
-    lumi: {
-        name: 'Lumi', builtIn: true, url: RELAY, models: [{ id: 'lumi', name: 'Lumi’s own', note: 'no key needed' }],
-    },
     claude: {
         name: 'Claude', url: 'https://api.anthropic.com/v1/messages', link: 'https://platform.claude.com', placeholder: 'sk-ant-…',
         keyOk: k => /^sk-ant-/.test(k), keyStore: 'lumi.chat.key', modelStore: 'lumi.chat.model',
@@ -43,14 +38,16 @@ export const MODELS = PROVIDERS.claude.models
 const ls = { get: k => { try { return localStorage.getItem(k) } catch { return null } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v) } catch { /* ignore */ } } }
 
 export const chatConfig = {
-    get provider() { return PROVIDERS[ls.get(PROVIDER)] ? ls.get(PROVIDER) : 'lumi' }, set provider(v) { ls.set(PROVIDER, PROVIDERS[v] ? v : null) },
+    // the chosen provider, else the first one that already has a key, else Claude
+    get provider() { const v = ls.get(PROVIDER); if (PROVIDERS[v]) return v; return Object.keys(PROVIDERS).find(id => this.keyFor(id)) || 'claude' },
+    set provider(v) { ls.set(PROVIDER, PROVIDERS[v] ? v : null) },
     get spec() { return PROVIDERS[this.provider] },
-    keyFor(p) { const st = PROVIDERS[p].keyStore; return st ? ls.get(st) || '' : '' },
-    setKey(p, v) { const st = PROVIDERS[p].keyStore; if (st) ls.set(st, v ? v.trim() : null) },
+    keyFor(p) { return ls.get(PROVIDERS[p].keyStore) || '' },
+    setKey(p, v) { ls.set(PROVIDERS[p].keyStore, v ? v.trim() : null) },
     get key() { return this.keyFor(this.provider) }, set key(v) { this.setKey(this.provider, v) },
-    get ready() { return !!(this.spec.builtIn || this.key) },
-    get model() { const { models, modelStore } = this.spec; const v = modelStore ? ls.get(modelStore) : null; return models.some(m => m.id === v) ? v : models[0].id },
-    set model(v) { if (this.spec.modelStore) ls.set(this.spec.modelStore, v) },
+    get ready() { return !!this.key },
+    get model() { const { models, modelStore } = this.spec; const v = ls.get(modelStore); return models.some(m => m.id === v) ? v : models[0].id },
+    set model(v) { ls.set(this.spec.modelStore, v) },
     history(bookId) { try { return JSON.parse(ls.get(HIST + bookId) || '[]') } catch { return [] } },
     saveHistory(bookId, msgs) { ls.set(HIST + bookId, msgs.length ? JSON.stringify(msgs.slice(-40)) : null) },
 }
@@ -78,7 +75,7 @@ export const persona = ({ title, author, fraction = 0, chapter = '', excerpt = '
 }
 
 /** Streams one reply. Yields { text } deltas and finally { stop } with a stop reason ('end_turn' | 'refusal' | …). */
-export function stream(opts) { return ({ openai: streamOpenAI, gemini: streamGemini, lumi: streamRelay }[opts.provider] || streamClaude)(opts) }
+export function stream(opts) { return ({ openai: streamOpenAI, gemini: streamGemini }[opts.provider] || streamClaude)(opts) }
 
 const readSSE = async function* (res) {
     const reader = res.body.getReader(), dec = new TextDecoder()
@@ -108,13 +105,6 @@ const claudeEvents = async function* (res) {
         else if (ev.type === 'message_delta' && ev.delta?.stop_reason) yield { stop: ev.delta.stop_reason }
         else if (ev.type === 'error') throw new ChatError(0, ev.error?.message)
     }
-}
-
-// Lumi's own model: the relay holds the credentials and speaks the same events as Claude
-export async function* streamRelay({ system, messages, signal, fetchFn = fetch }) {
-    const res = await fetchFn(PROVIDERS.lumi.url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ system, messages }), signal })
-    if (!res.ok) await fail(res)
-    yield* claudeEvents(res)
 }
 
 export async function* streamClaude({ key, model, system, messages, signal, fetchFn = fetch }) {
@@ -177,13 +167,6 @@ const SUGGEST = ['what just happened?', 'who’s who so far?', 'explain this par
 const SUGGEST_QUOTE = ['what does this passage mean?', 'why is this line here?', 'say it in plain words']
 const friendly = e => {
     if (e.name === 'AbortError') return ''
-    if (chatConfig.provider === 'lumi') {
-        if (e.status === 429) return 'i need a breather. ask again in a minute?'
-        if (e.status === 403) return 'this copy of the app can’t reach my model. use your own key in settings?'
-        if (e.status === 503 || e.status === 502 || e.status === 404) return 'my model is napping right now. try again later, or use your own key in settings.'
-        if (e.status === 0 || e instanceof TypeError) return 'can’t reach my model. are you online?'
-        return e.message ? `hmm: ${e.message}` : 'something went wrong.'
-    }
     if (e.status === 401) return 'that key didn’t work. check it in settings?'
     if (e.status === 403) return 'that key isn’t allowed to do this.'
     if (e.status === 429) return chatConfig.provider === 'gemini' ? 'gemini’s free quota is used up for now. try again in a minute, or tomorrow.' : /quota|billing|credit/i.test(e.message) ? 'that key is out of credits.' : 'too many questions at once, give it a moment.'
@@ -249,13 +232,10 @@ export class LumiChat {
         for (const b of this.q('#chat-providers').children) b.classList.toggle('active', b.dataset.provider === chatConfig.provider)
         this.q('#chat-models').innerHTML = spec.models.map(m => `<button type="button" class="chip" data-model="${m.id}">${m.name}<small>${m.note}</small></button>`).join('')
         this.#syncModels()
-        const own = !spec.builtIn
-        this.q('.chat-key-row').hidden = !own; this.q('#chat-models').hidden = !own; this.q('#chat-key-link').hidden = !own
-        this.q('#chat-builtin').hidden = own
-        const key = this.q('#chat-key'); key.value = chatConfig.key; key.placeholder = spec.placeholder || ''
-        if (own) this.q('#chat-key-link').href = spec.link
-        this.q('#chat-key-forget').hidden = !(own && this.ready)
-        this.q('.chat-head .sub').textContent = `about this book · no spoilers${own && this.ready ? ' · ' + spec.name.toLowerCase() : ''}`
+        const key = this.q('#chat-key'); key.value = chatConfig.key; key.placeholder = spec.placeholder
+        this.q('#chat-key-link').href = spec.link
+        this.q('#chat-key-forget').hidden = !this.ready
+        this.q('.chat-head .sub').textContent = `about this book · no spoilers${this.ready ? ' · ' + spec.name.toLowerCase() : ''}`
     }
     #syncModels() { for (const b of this.q('#chat-models').children) b.classList.toggle('active', b.dataset.model === chatConfig.model) }
     #saveSetup() {
@@ -272,7 +252,7 @@ export class LumiChat {
         this.log.innerHTML = ''
         if (!this.messages.length) {
             const hello = document.createElement('div'); hello.className = 'chat-hello'
-            hello.textContent = this.ready ? 'ask me anything about what you’ve read so far. i won’t spoil what’s ahead.' : 'i can chat about the book once you give me a key, or switch me back to my own model.'
+            hello.textContent = this.ready ? 'ask me anything about what you’ve read so far. i won’t spoil what’s ahead.' : 'i can chat about the book once you give me a key.'
             this.log.append(hello)
         }
         for (const m of this.messages) this.#bubble(m.role, m.content)
