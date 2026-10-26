@@ -1,6 +1,6 @@
 {
-  "name": "Otto",
-  "short_name": "Otto",
+  "name": "Lumi",
+  "short_name": "Lumi",
   "description": "A cosy reader for EPUB, PDF, MOBI, FB2, CBZ and text, with a built-in dictionary.",
   "start_url": "./index.html",
   "scope": "./",

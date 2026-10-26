@@ -9,9 +9,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Otto">
+<meta name="apple-mobile-web-app-title" content="Lumi">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; connect-src *; frame-src blob: data:; worker-src 'self' blob:; form-action 'none';">
-<title>Otto</title>
+<title>Lumi</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/icon-192.png">
@@ -31,19 +31,25 @@
 
 <header class="top">
   <div class="brand">
-    <svg class="mascot" viewBox="0 0 64 64" aria-hidden="true">
-      <path class="m-page" d="M18 8h22l10 10v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"/>
-      <path class="m-shade" d="M40 8v7a3 3 0 0 0 3 3h7z" opacity="0.18"/>
-      <path class="m-fold" d="M40 8v7a3 3 0 0 0 3 3h7z"/>
-      <ellipse class="m-eye" cx="27" cy="32" rx="2.5" ry="2.9"/><ellipse class="m-eye" cx="38" cy="32" rx="2.5" ry="2.9"/>
-      <circle class="m-glint" cx="27.9" cy="31" r="0.9"/><circle class="m-glint" cx="38.9" cy="31" r="0.9"/>
-      <path class="m-smile" d="M27 40.5q5.5 5.5 11 0"/>
-      <circle class="m-o" cx="32.5" cy="41.5" r="2.6"/>
-      <ellipse class="m-blush" cx="22.2" cy="37.6" rx="2.4" ry="1.5"/><ellipse class="m-blush" cx="42.8" cy="37.6" rx="2.4" ry="1.5"/>
-      <text class="m-z" x="46" y="20">z</text>
+    <svg class="mascot" viewBox="2 10 64 46" aria-hidden="true">
+      <circle class="m-glow" cx="52" cy="42" r="12"/>
+      <circle class="m-tail" cx="52" cy="42" r="7.5"/>
+      <path class="m-leg" d="M38 50v3.5M44 50.5v3.5"/>
+      <circle class="m-seg" cx="41" cy="41" r="9.5"/>
+      <path class="m-leg" d="M26 48v3.5M33 48.5v3.5"/>
+      <circle class="m-seg" cx="30" cy="38" r="10.5"/>
+      <path class="m-ant" d="M13.5 22q-3.5-4.5-7.5-6.5"/><circle class="m-tip" cx="5.6" cy="15.2" r="2.3"/>
+      <path class="m-ant" d="M22.5 21.5q2-5 6-7"/><circle class="m-tip" cx="28.8" cy="14.2" r="2.3"/>
+      <circle class="m-head" cx="18" cy="34" r="13"/>
+      <ellipse class="m-eye" cx="13.5" cy="33" rx="2.4" ry="2.9"/><ellipse class="m-eye" cx="23" cy="33" rx="2.4" ry="2.9"/>
+      <circle class="m-glint" cx="14.3" cy="32" r="0.9"/><circle class="m-glint" cx="23.8" cy="32" r="0.9"/>
+      <path class="m-smile" d="M14 39.5q4.5 4 9 0"/>
+      <circle class="m-o" cx="18.5" cy="40.5" r="2.4"/>
+      <ellipse class="m-blush" cx="9.3" cy="37.6" rx="2.4" ry="1.5"/><ellipse class="m-blush" cx="27.2" cy="37.6" rx="2.4" ry="1.5"/>
+      <text class="m-z" x="38" y="15">z</text>
     </svg>
     <div>
-      <h1><span class="hl">Otto</span></h1>
+      <h1><span class="hl">Lumi</span></h1>
     </div>
   </div>
   <div class="actions">
@@ -67,7 +73,7 @@
 <main>
   <div id="install-hint" class="hint" hidden>
     <span class="sticker s-sun">psst</span>
-    <div><strong>put Otto on your home screen.</strong> In Safari tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>. Full screen, works offline, no app store.</div>
+    <div><strong>put Lumi on your home screen.</strong> In Safari tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>. Full screen, works offline, no app store.</div>
     <button id="hint-close" class="pill">got it</button>
   </div>
 
@@ -123,14 +129,22 @@
   </section>
 
   <div id="empty" class="empty" hidden>
-    <svg class="mascot empty-art" viewBox="0 0 64 64" aria-hidden="true">
-      <path class="m-page" d="M18 8h22l10 10v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"/>
-      <path class="m-shade" d="M40 8v7a3 3 0 0 0 3 3h7z" opacity="0.18"/>
-      <path class="m-fold" d="M40 8v7a3 3 0 0 0 3 3h7z"/>
-      <ellipse class="m-eye" cx="27" cy="32" rx="2.5" ry="2.9"/><ellipse class="m-eye" cx="38" cy="32" rx="2.5" ry="2.9"/>
-      <circle class="m-glint" cx="27.9" cy="31" r="0.9"/><circle class="m-glint" cx="38.9" cy="31" r="0.9"/>
-      <path class="m-smile" d="M27 40.5q5.5 5.5 11 0"/>
-      <ellipse class="m-blush" cx="22.2" cy="37.6" rx="2.4" ry="1.5"/><ellipse class="m-blush" cx="42.8" cy="37.6" rx="2.4" ry="1.5"/>
+    <svg class="mascot empty-art" viewBox="2 10 64 46" aria-hidden="true">
+      <circle class="m-glow" cx="52" cy="42" r="12"/>
+      <circle class="m-tail" cx="52" cy="42" r="7.5"/>
+      <path class="m-leg" d="M38 50v3.5M44 50.5v3.5"/>
+      <circle class="m-seg" cx="41" cy="41" r="9.5"/>
+      <path class="m-leg" d="M26 48v3.5M33 48.5v3.5"/>
+      <circle class="m-seg" cx="30" cy="38" r="10.5"/>
+      <path class="m-ant" d="M13.5 22q-3.5-4.5-7.5-6.5"/><circle class="m-tip" cx="5.6" cy="15.2" r="2.3"/>
+      <path class="m-ant" d="M22.5 21.5q2-5 6-7"/><circle class="m-tip" cx="28.8" cy="14.2" r="2.3"/>
+      <circle class="m-head" cx="18" cy="34" r="13"/>
+      <ellipse class="m-eye" cx="13.5" cy="33" rx="2.4" ry="2.9"/><ellipse class="m-eye" cx="23" cy="33" rx="2.4" ry="2.9"/>
+      <circle class="m-glint" cx="14.3" cy="32" r="0.9"/><circle class="m-glint" cx="23.8" cy="32" r="0.9"/>
+      <path class="m-smile" d="M14 39.5q4.5 4 9 0"/>
+      <circle class="m-o" cx="18.5" cy="40.5" r="2.4"/>
+      <ellipse class="m-blush" cx="9.3" cy="37.6" rx="2.4" ry="1.5"/><ellipse class="m-blush" cx="27.2" cy="37.6" rx="2.4" ry="1.5"/>
+      <text class="m-z" x="38" y="15">z</text>
     </svg>
     <h2>nothing here yet</h2>
     <p class="muted">tap <strong>add books</strong>, or <button id="empty-find" class="link">find free books</button>.</p>
@@ -219,10 +233,10 @@
     <ul>
       <li><b>back up shelf</b> saves one file with every book, your positions, highlights and stats. put it in iCloud Drive or Google Drive, then <b>restore a backup</b> on the other device. positions merge: the furthest read wins.</li>
     </ul>
-    <h3>send to Otto</h3>
+    <h3>send to Lumi</h3>
     <ul>
-      <li><b>Android:</b> install Otto from Chrome’s menu; it then appears in every app’s Share sheet.</li>
-      <li><b>iPhone:</b> Apple doesn’t let web apps into the Share sheet. the quick route: in Mail or Safari tap the file → Share → <b>Save to Files</b>, then open Otto and tap <b>add books</b>. a Shortcut named “Send to Otto” that does the Save-to-Files step with one tap: open Shortcuts → + → add “Save File” (ask where: off, folder: Otto) → add “Open URL” with this page’s address → in the Shortcut details enable “Show in Share Sheet”.</li>
+      <li><b>Android:</b> install Lumi from Chrome’s menu; it then appears in every app’s Share sheet.</li>
+      <li><b>iPhone:</b> Apple doesn’t let web apps into the Share sheet. the quick route: in Mail or Safari tap the file → Share → <b>Save to Files</b>, then open Lumi and tap <b>add books</b>. a Shortcut named “Send to Lumi” that does the Save-to-Files step with one tap: open Shortcuts → + → add “Save File” (ask where: off, folder: Lumi) → add “Open URL” with this page’s address → in the Shortcut details enable “Show in Share Sheet”.</li>
     </ul>
   </div>
 </div>

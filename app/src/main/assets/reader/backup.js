@@ -36,9 +36,9 @@ export const restoreBackup = async (blob, onProgress = () => {}) => {
     const entries = await reader.getEntries()
     const byName = new Map(entries.map(e => [e.filename, e]))
     const manifestEntry = byName.get('dogear.json')
-    if (!manifestEntry) throw new Error('Not an Otto backup')
+    if (!manifestEntry) throw new Error('Not a Lumi backup')
     const manifest = JSON.parse(await manifestEntry.getData(new TextWriter()))
-    if (manifest.app !== 'dogear') throw new Error('Not an Otto backup')
+    if (manifest.app !== 'dogear') throw new Error('Not a Lumi backup')
     const existing = new Map((await library.all()).map(b => [b.id, b]))
     let added = 0, updated = 0, i = 0
     for (const b of manifest.books) {

@@ -1,4 +1,4 @@
-// Offline cache for Otto. The precache list and version are filled in by build.mjs.
+// Offline cache for Lumi. The precache list and version are filled in by build.mjs.
 //
 // Strategy: the small "app shell" (HTML, CSS, JS) is network-first so an update is
 // never served half old / half new; heavy, versioned libraries (foliate, pdf.js,
@@ -26,7 +26,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
     e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()))
 })
-// Web Share Target (Android): files shared to Otto are stored straight into the shelf.
+// Web Share Target (Android): files shared to Lumi are stored straight into the shelf.
 const FORMATS = { epub: 'application/epub+zip', pdf: 'application/pdf', mobi: 'application/x-mobipocket-ebook', azw: 'application/x-mobipocket-ebook', azw3: 'application/vnd.amazon.mobi8-ebook', kf8: 'application/vnd.amazon.mobi8-ebook', prc: 'application/x-mobipocket-ebook', fb2: 'application/x-fictionbook+xml', fbz: 'application/x-zip-compressed-fb2', cbz: 'application/vnd.comicbook+zip', txt: 'text/plain', md: 'text/markdown', markdown: 'text/markdown', html: 'text/html', htm: 'text/html', xhtml: 'application/xhtml+xml' }
 const openDB = () => new Promise((resolve, reject) => {
     const r = indexedDB.open('dogear-db-probe-unused', 1); r.onsuccess = () => { r.result.close(); indexedDB.deleteDatabase('dogear-db-probe-unused'); resolve() }; r.onerror = () => resolve()

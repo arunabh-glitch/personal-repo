@@ -33,12 +33,15 @@ h1, h2 { font-family: var(--display); margin: 0; letter-spacing: -0.02em; font-v
 
 .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: calc(14px + var(--sat)) 18px 8px; max-width: 1100px; width: 100%; margin: 0 auto; flex: none; }
 .brand { display: flex; align-items: center; gap: 12px; min-height: 52px; }
-.mascot { width: 52px; height: 52px; flex: none; overflow: visible; animation: peek 5s ease-in-out infinite; transform-origin: 50% 90%; }
+.mascot { width: 74px; height: 53px; flex: none; overflow: visible; animation: peek 5s ease-in-out infinite; transform-origin: 30% 90%; }
 @keyframes peek { 0%, 86%, 100% { transform: rotate(0) } 90% { transform: rotate(-6deg) } 95% { transform: rotate(4deg) } }
-.m-page { fill: var(--card); stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
-.m-shade { fill: var(--ink); transform: translate(-1px, 1.5px); }
-.m-fold { fill: var(--pink); stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; transform-box: fill-box; transform-origin: 0% 100%; }
-@keyframes flap { 0%, 68%, 100% { transform: rotate(0) } 74% { transform: rotate(-16deg) } 80% { transform: rotate(7deg) } 86% { transform: rotate(-5deg) } 92% { transform: rotate(2deg) } }
+.m-head, .m-seg { fill: var(--lime); stroke: var(--ink); stroke-width: 2.5; }
+.m-tail { fill: var(--sun); stroke: var(--ink); stroke-width: 2.5; }
+.m-glow { fill: var(--sun); opacity: 0.3; transform-box: fill-box; transform-origin: center; }
+@media (prefers-color-scheme: dark) { .m-glow { fill: #fff6c8; opacity: 0.9; } }
+.m-leg, .m-ant { stroke: var(--ink); stroke-width: 2.5; stroke-linecap: round; fill: none; }
+.m-ant { transform-box: fill-box; transform-origin: 50% 100%; }
+.m-tip { fill: var(--pink); stroke: var(--ink); stroke-width: 2; }
 .m-eye { fill: var(--ink); transform-box: fill-box; transform-origin: center; }
 .m-glint { fill: #fff; }
 .m-smile { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linecap: round; }
@@ -59,13 +62,16 @@ h1, h2 { font-family: var(--display); margin: 0; letter-spacing: -0.02em; font-v
 .mascot.is-wink .m-eye:nth-of-type(2) { transform: scaleY(0.08); } .mascot.is-wink .m-glint:nth-of-type(2) { opacity: 0; }
 .mascot.is-wink .m-smile { transform: translateX(1px) rotate(-6deg); }
 .mascot.is-surprised .m-eye { transform: scale(1.35); } .mascot.is-surprised .m-smile { opacity: 0; } .mascot.is-surprised .m-o { opacity: 1; }
-.mascot.is-surprised .m-fold { animation: flap1 0.5s ease-out; }
+.mascot.is-surprised .m-glow { animation: glow1 0.6s ease-out; } .mascot.is-surprised .m-ant { animation: antenna 0.6s ease-out; }
 .mascot.is-sleepy { animation: sway 3.2s ease-in-out infinite; } .mascot.is-sleepy .m-eye { transform: scaleY(0.35) translateY(0.6px); } .mascot.is-sleepy .m-glint { opacity: 0; }
-.mascot.is-sleepy .m-smile { transform: scaleX(0.7); } .mascot.is-sleepy .m-z { animation: zz 1.8s ease-out infinite; }
+.mascot.is-sleepy .m-smile { transform: scaleX(0.7); } .mascot.is-sleepy .m-z { animation: zz 1.8s ease-out infinite; } .mascot.is-sleepy .m-glow { animation: dim 3.2s ease-in-out infinite; }
+@keyframes dim { 0%, 100% { transform: scale(0.6) } 50% { transform: scale(0.9) } }
 @keyframes sway { 0%, 100% { transform: rotate(-2deg) } 50% { transform: rotate(3deg) translateY(1px) } }
 @keyframes zz { 0% { opacity: 0; transform: translate(0, 0) scale(0.7) } 25% { opacity: 1 } 100% { opacity: 0; transform: translate(6px, -12px) scale(1.2) } }
-.mascot.is-flap .m-fold, .mascot.is-excited .m-fold { animation: flap1 0.9s ease-in-out; }
-@keyframes flap1 { 0%, 100% { transform: rotate(0) } 20% { transform: rotate(-18deg) } 45% { transform: rotate(8deg) } 65% { transform: rotate(-6deg) } 85% { transform: rotate(2deg) } }
+.mascot.is-glow .m-glow, .mascot.is-excited .m-glow { animation: glow1 1s ease-in-out; }
+@keyframes glow1 { 0%, 100% { transform: scale(1) } 40% { transform: scale(1.6) } }
+.mascot.is-glow .m-ant, .mascot.is-excited .m-ant { animation: antenna 0.9s ease-in-out; }
+@keyframes antenna { 0%, 100% { transform: rotate(0) } 30% { transform: rotate(-12deg) } 60% { transform: rotate(10deg) } 85% { transform: rotate(-4deg) } }
 .mascot.is-wiggle { animation: wiggle 0.7s ease-in-out; }
 @keyframes wiggle { 0%, 100% { transform: rotate(0) } 25% { transform: rotate(-9deg) } 50% { transform: rotate(8deg) } 75% { transform: rotate(-4deg) } }
 .mascot.is-bounce, .mascot.is-excited { animation: boing 0.7s cubic-bezier(.34,1.56,.64,1); }
@@ -129,9 +135,9 @@ main { flex: 1; min-height: 0; width: 100%; overflow-y: auto; overflow-x: hidden
 .a { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .empty { text-align: center; padding: 30px 18px 20px; }
-.empty-art { width: 150px; height: 150px; animation: none; }
+.empty-art { width: 210px; height: 151px; animation: none; }
 @keyframes bob { 0%, 100% { transform: translateY(0) rotate(-2deg) } 50% { transform: translateY(-8px) rotate(2deg) } }
-.empty-art .m-page, .empty-art .m-fold, .empty-art .m-smile { stroke-width: 2.2; }
+.empty-art .m-head, .empty-art .m-seg, .empty-art .m-tail, .empty-art .m-smile { stroke-width: 2.2; }
 .empty h2 { font-size: 30px; margin: 8px 0 8px; font-weight: 800; }
 .muted { color: var(--muted); font-size: 15px; line-height: 1.5; max-width: 30em; margin: 0 auto; font-weight: 500; }
 .storage { text-align: center; margin-top: 32px; font-size: 12px; color: var(--muted); font-weight: 600; }

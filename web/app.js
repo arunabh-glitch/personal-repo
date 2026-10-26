@@ -175,7 +175,7 @@ $('#sheet').addEventListener('click', async e => {
 const mascotLife = () => {
     const m = $('.top .mascot')
     if (!m || matchMedia('(prefers-reduced-motion: reduce)').matches) return { act: () => {} }
-    const ACTS = [['blink', 320, 6], ['dblblink', 600, 2], ['look-left', 1100, 2], ['look-right', 1100, 2], ['look-up', 900, 1], ['happy', 1500, 2], ['wink', 600, 1], ['surprised', 1000, 1], ['flap', 900, 3], ['wiggle', 700, 1], ['bounce', 700, 1]]
+    const ACTS = [['blink', 320, 6], ['dblblink', 600, 2], ['look-left', 1100, 2], ['look-right', 1100, 2], ['look-up', 900, 1], ['happy', 1500, 2], ['wink', 600, 1], ['surprised', 1000, 1], ['glow', 1000, 3], ['wiggle', 700, 1], ['bounce', 700, 1]]
     let busy = null, lastTouch = Date.now(), asleep = false
     const clear = () => { if (busy) { clearTimeout(busy.t); m.classList.remove('is-' + busy.name); busy = null } }
     const act = (name, ms, force = false) => {
@@ -323,7 +323,7 @@ const backup = async () => {
         const blob = await createBackup()
         const a = document.createElement('a')
         a.href = URL.createObjectURL(blob)
-        a.download = `otto-backup-${new Date().toISOString().slice(0, 10)}.zip`
+        a.download = `lumi-backup-${new Date().toISOString().slice(0, 10)}.zip`
         document.body.append(a); a.click(); a.remove()
         setTimeout(() => URL.revokeObjectURL(a.href), 60000)
         toast(`backup ready (${fmtSize(blob.size)}) — save it to Files or Drive`, 4000)
@@ -402,7 +402,7 @@ const addFromUrl = async () => {
     } finally { busy(false) }
 }
 
-// Files shared to Otto (Android share target) arrive via the service worker with ?shared=N
+// Files shared to Lumi (Android share target) arrive via the service worker with ?shared=N
 {
     const n = +new URLSearchParams(location.search).get('shared')
     if (n > 0) { history.replaceState(null, '', location.pathname); setTimeout(() => toast(n === 1 ? 'shared book added' : `${n} shared books added`), 400) }

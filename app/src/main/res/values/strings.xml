@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Otto</string>
+    <string name="app_name">Lumi</string>
     <string name="library">Shelf</string>
     <string name="add_books">Add books</string>
     <string name="catalogs">Catalogs</string>
@@ -41,7 +41,7 @@
     <string name="formats_label">Formats: %1$s</string>
     <string name="loading">Loading…</string>
     <string name="reader_error">Could not open this book: %1$s</string>
-    <string name="reader_error_title">Otto couldn’t open this</string>
+    <string name="reader_error_title">Lumi couldn’t open this</string>
     <string name="reader_timeout">The reader did not start within 30 seconds (stuck at: %1$s). If this keeps happening, update “Android System WebView” from the Play Store (installed version: %2$s).</string>
     <string name="built_in">Built-in</string>
     <string name="custom">Custom</string>

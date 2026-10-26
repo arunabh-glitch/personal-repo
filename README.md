@@ -1,4 +1,6 @@
-# Otto
+# Lumi
+
+Lumi is a glow-worm: the bookworm that lights your page.
 
 A cosy e-book reader with a built-in dictionary. Fold the corner, pick up where you left off.
 
@@ -12,11 +14,11 @@ Runs as an Android app and as an installable web app for iPhone, iPad and deskto
 - My words: "save word" on a meaning card keeps it (with its sentence and book) in a vocabulary list with pronunciation, and a flashcard quiz to practise.
 - Tags (collections), search, and a "find free books" catalog (Project Gutenberg via Gutendex, Internet Archive) that downloads straight to the shelf.
 - Back up shelf / restore a backup: one zip with books, positions, highlights, stats, saved words and settings, for moving between devices (positions merge, furthest read wins).
-- Android: Otto registers as a share target once installed from Chrome. iPhone: web apps can't join the Share sheet; the in-app tips describe a Save-to-Files shortcut.
+- Android: Lumi registers as a share target once installed from Chrome. iPhone: web apps can't join the Share sheet; the in-app tips describe a Save-to-Files shortcut.
 
 **Sources**
 - Import from any file manager or cloud drive via the system file picker (multi-select).
-- "Open with" / "Share to Otto" from other apps (mail attachments, browsers, Telegram, Drive…).
+- "Open with" / "Share to Lumi" from other apps (mail attachments, browsers, Telegram, Drive…).
 - Built-in OPDS catalogs: Project Gutenberg, Standard Ebooks, Feedbooks, Unglue.it, Internet Archive — browse, search and download straight into the library.
 - Add your own OPDS catalog (Calibre-Web, Kavita, Komga, Calibre content server, …).
 - Download a book from a direct URL.
@@ -41,7 +43,7 @@ The same reader ships as an installable web app (`web/`). It keeps your books in
 private storage, works offline, and opens full screen from the home screen.
 
 **Install on iPhone:** open the hosted URL in Safari, tap **Share → Add to Home Screen**. Then open
-Otto from the home screen, tap **+** and pick books from Files, iCloud Drive or Downloads.
+Lumi from the home screen, tap **+** and pick books from Files, iCloud Drive or Downloads.
 
 Limits compared with the Android app: no "Open with" from other apps (use **+** or the Share sheet's
 "Save to Files" first), and catalog downloads only work from sites that allow cross-origin requests.
@@ -105,4 +107,4 @@ app/src/main/assets/reader/   index.html, reader.js, reader.css, pdf-viewer.js, 
 
 ## Licenses
 
-Otto is MIT licensed. Bundled: foliate-js (MIT), pdf.js (Apache-2.0), zip.js (BSD-3), fflate (MIT), Fraunces typeface (SIL OFL). Definitions come from the free Dictionary API and Wiktionary.
+Lumi is MIT licensed. Bundled: foliate-js (MIT), pdf.js (Apache-2.0), zip.js (BSD-3), fflate (MIT), Fraunces typeface (SIL OFL). Definitions come from the free Dictionary API and Wiktionary.
