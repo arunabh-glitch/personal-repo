@@ -1,6 +1,6 @@
 # Lumi
 
-Lumi means light: the mark is a glowing dot, the dot of the i, that keeps your page lit.
+Lumi means light. The mark is the dot of the i: a small sun-yellow dot.
 
 A cosy e-book reader with a built-in dictionary. Fold the corner, pick up where you left off.
 
