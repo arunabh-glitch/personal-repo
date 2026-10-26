@@ -38,26 +38,7 @@ export class Listener extends EventTarget {
         this.rate = +(localStorage.getItem('dogear.listen.rate') || 1)
         this.queue = []; this.pos = 0
         this.synth = globalThis.speechSynthesis
-        // Opt-in: keep a silent track playing so iOS routes speech through the media channel, which ignores the ring/silent switch.
-        this.silentMode = localStorage.getItem('dogear.listen.silent') === '1'
     }
-    setSilentMode(on) {
-        this.silentMode = !!on
-        localStorage.setItem('dogear.listen.silent', on ? '1' : '0')
-        if (this.state === 'playing') on ? this.#audioOn() : this.#audioOff()
-    }
-    #silentAudio() {
-        const sr = 8000, n = 8000, buf = new Uint8Array(44 + n), dv = new DataView(buf.buffer)
-        const str = (o, t) => { for (let i = 0; i < t.length; i++) buf[o + i] = t.charCodeAt(i) }
-        str(0, 'RIFF'); dv.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt '); dv.setUint32(16, 16, true)
-        dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, sr, true); dv.setUint32(28, sr, true)
-        dv.setUint16(32, 1, true); dv.setUint16(34, 8, true); str(36, 'data'); dv.setUint32(40, n, true); buf.fill(128, 44)
-        const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })))
-        a.loop = true; a.setAttribute('playsinline', ''); a.preload = 'auto'
-        return a
-    }
-    #audioOn() { if (!this.silentMode) return; try { this.keepAlive ??= this.#silentAudio(); this.keepAlive.play()?.catch?.(() => {}) } catch { /* no audio element */ } }
-    #audioOff() { try { this.keepAlive?.pause() } catch { /* ignore */ } }
     get supported() { return !!this.synth && 'SpeechSynthesisUtterance' in globalThis }
 
     // The foliate text-to-speech helpers are loaded ahead of time so that start() can reach its first
@@ -78,7 +59,6 @@ export class Listener extends EventTarget {
     async start() {
         if (!this.supported) throw new Error('This device has no text-to-speech voices.')
         this.#unstick()
-        this.#audioOn()
         if (this.synth.speaking || this.synth.pending) this.synth.cancel()
         this.stalls = 0
         if (this.pdf) { this.#prime(); await this.#loadPdfPage(this.pdf.current) }
@@ -87,10 +67,10 @@ export class Listener extends EventTarget {
         this.#setState('playing')
         this.#speakCurrent()
     }
-    pause() { if (this.state !== 'playing') return; this.synth.cancel(); this.#audioOff(); this.#setState('paused') }
-    resume() { if (this.state !== 'paused') return; this.#unstick(); this.#audioOn(); this.#setState('playing'); this.#speakCurrent() }
+    pause() { if (this.state !== 'playing') return; this.synth.cancel(); this.#setState('paused') }
+    resume() { if (this.state !== 'paused') return; this.#unstick(); this.#setState('playing'); this.#speakCurrent() }
     toggle() { this.state === 'playing' ? this.pause() : this.state === 'paused' ? this.resume() : this.start() }
-    stop() { clearTimeout(this.restartTimer); clearTimeout(this.watchdog); this.synth?.cancel(); this.#audioOff(); this.queue = []; this.pos = 0; this.onHighlight(null); this.#setState('idle') }
+    stop() { clearTimeout(this.restartTimer); clearTimeout(this.watchdog); this.synth?.cancel(); this.queue = []; this.pos = 0; this.onHighlight(null); this.#setState('idle') }
     next() { if (this.state === 'idle') return; this.pos++; this.#restart(true) }
     prev() { if (this.state === 'idle') return; this.pos = Math.max(0, this.pos - 1); this.#restart(true) }
 

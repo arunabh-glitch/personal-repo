@@ -814,7 +814,6 @@ class Reader {
         }
         if (!this.listener.supported) { this.toast('no voices on this device'); return }
         $$('.ls-rates button').forEach(x => x.classList.toggle('active', +x.dataset.rate === this.listener.rate))
-        $('#ls-silent').setAttribute('aria-pressed', String(this.listener.silentMode))
         this.showBars(false)
         try { await this.listener.start() } catch (e) { this.toast(e.message) }
     }
@@ -988,12 +987,6 @@ class Reader {
         $('#ls-prev').addEventListener('click', () => this.listener?.prev())
         $('#ls-next').addEventListener('click', () => this.listener?.next())
         $('#ls-close').addEventListener('click', () => this.stopListen())
-        $('#ls-silent').addEventListener('click', () => {
-            const on = !this.listener?.silentMode
-            this.listener?.setSilentMode(on)
-            $('#ls-silent').setAttribute('aria-pressed', String(on))
-            this.toast(on ? 'plays even when the phone is on silent' : 'follows the ring/silent switch', 2200)
-        })
         $$('.ls-rates button').forEach(b => b.addEventListener('click', () => { this.listener?.setRate(+b.dataset.rate); $$('.ls-rates button').forEach(x => x.classList.toggle('active', x === b)) }))
         $('#finish-shelf').addEventListener('click', () => bridge.close())
         $('#finish-stay').addEventListener('click', () => { $('#finish').hidden = true })
