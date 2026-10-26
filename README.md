@@ -24,7 +24,7 @@ Runs as an Android app and as an installable web app for iPhone, iPad and deskto
 **Reader**
 - Hold a word: meaning, translation (free MyMemory), pronunciation, and highlight colours; "whole sentence" grows the selection; "+ note" attaches a note. A "select text" mode adds a small toolbar for arbitrary passages.
 - Highlights & notes are listed next to the table of contents and redraw on every open (EPUB, text and PDF).
-- Listen: read-aloud with the device voices, sentence highlighted as it goes, speed control, continues across chapters.
+- Listen: read-aloud with the device voices, sentence highlighted as it goes, speed control, continues across chapters. A voice picker lists the installed voices for the book's language (Enhanced/Premium on iPhone, downloadable Google voices on Android) with a preview and a fine speed slider; footnote markers and similar noise are not read aloud.
 - Presets: cosy, focus, night owl.
 - Reading sessions are recorded automatically; finishing a book brings confetti.
 - Long-press (or double-tap) any word to see its meaning, pronunciation and examples without leaving the page. Looked-up words are cached, so they work offline afterwards. Works in EPUBs, PDFs and text files.

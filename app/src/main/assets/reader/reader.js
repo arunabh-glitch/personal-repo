@@ -797,6 +797,13 @@ class Reader {
     // ---------- listen ----------
     async toggleListen() {
         if (this.listener && this.listener.state !== 'idle') { this.listener.toggle(); return }
+        this.#ensureListener()
+        if (!this.listener.supported) { this.toast('no voices on this device'); return }
+        $$('.ls-rates button').forEach(x => x.classList.toggle('active', +x.dataset.rate === this.listener.rate))
+        this.showBars(false)
+        try { await this.listener.start() } catch (e) { this.toast(e.message) }
+    }
+    #ensureListener() {
         if (!this.listener) {
             this.listener = new Listener({
                 view: this.kind === 'pdf' ? null : this.view, pdf: this.kind === 'pdf' ? this.pdf : null, lang: this.lang || 'en',
@@ -811,11 +818,35 @@ class Reader {
             })
             this.listener.addEventListener('done', () => this.toast('end of book'))
             this.listener.addEventListener('error', e => this.toast(e.detail === 'stalled' ? 'no speech is coming from the device. check the ringer switch and volume, then try again' : 'speech isn’t available right now', 4000))
+            this.listener.addEventListener('voice-fallback', () => { this.toast('that voice went quiet, back to the device default', 3000); this.#renderVoices() })
+            this.listener.addEventListener('voices', () => { if (!$('#voice-panel').classList.contains('hidden')) this.#renderVoices() })
         }
-        if (!this.listener.supported) { this.toast('no voices on this device'); return }
-        $$('.ls-rates button').forEach(x => x.classList.toggle('active', +x.dataset.rate === this.listener.rate))
-        this.showBars(false)
-        try { await this.listener.start() } catch (e) { this.toast(e.message) }
+        return this.listener
+    }
+    openVoicePanel() {
+        const l = this.#ensureListener()
+        if (!l.supported) { this.toast('no voices on this device'); return }
+        $('#voice-rate').value = l.rate; $('#voice-rate-val').textContent = l.rate.toFixed(2).replace(/0$/, '') + '×'
+        const ua = navigator.userAgent
+        $('#voice-hint').innerHTML = /iPhone|iPad/.test(ua)
+            ? 'want a nicer voice? on iPhone go to <b>Settings → Accessibility → Spoken Content → Voices → English</b> and download an <b>Enhanced</b> or <b>Premium</b> voice. it shows up here once installed.'
+            : /Android/.test(ua)
+                ? 'want a nicer voice? on Android go to <b>Settings → Accessibility → Text-to-speech output → Google Text-to-speech → Install voice data</b> and pick a higher-quality voice. voices marked <b>online</b> need a connection.'
+                : 'voices come from this device. install more in your system’s accessibility or speech settings.'
+        this.#renderVoices()
+        this.openPanel('voice-panel')
+    }
+    #renderVoices() {
+        const l = this.listener; if (!l) return
+        const list = l.voices(), cur = l.voiceFailed ? '' : l.voiceURI
+        const row = (uri, name, meta, q) => `<button class="voice-row${uri === cur ? ' active' : ''}" data-uri="${escapeHTML(uri)}"><span class="vn">${escapeHTML(name)}</span>${q ? `<span class="vq ${q}">${q}</span>` : ''}${meta ? `<small>${escapeHTML(meta)}</small>` : ''}</button>`
+        $('#voice-list').innerHTML = row('', 'device default', '', '') + list.map(v => row(v.uri, v.name.replace(/\s*\((enhanced|premium)\)/i, ''), v.lang, v.quality)).join('')
+            + (list.length ? '' : `<p class="dict-empty">no ${escapeHTML(this.lang || 'en')} voices are installed yet.</p>`)
+        $$('#voice-list .voice-row').forEach(b => b.addEventListener('click', () => {
+            l.setVoice(b.dataset.uri)
+            this.#renderVoices()
+            if (l.state !== 'playing') l.preview(this.pending?.range?.toString().trim() || 'Hold a word for its meaning, and it reads along as you go.')
+        }))
     }
     stopListen() { this.listener?.stop() }
     #ttsHighlight(target) {
@@ -987,7 +1018,14 @@ class Reader {
         $('#ls-prev').addEventListener('click', () => this.listener?.prev())
         $('#ls-next').addEventListener('click', () => this.listener?.next())
         $('#ls-close').addEventListener('click', () => this.stopListen())
-        $$('.ls-rates button').forEach(b => b.addEventListener('click', () => { this.listener?.setRate(+b.dataset.rate); $$('.ls-rates button').forEach(x => x.classList.toggle('active', x === b)) }))
+        $('#ls-voice').addEventListener('click', () => this.openVoicePanel())
+        $('#voice-rate').addEventListener('input', e => {
+            const r = +e.target.value
+            this.listener?.setRate(r)
+            $('#voice-rate-val').textContent = r.toFixed(2).replace(/0$/, '') + '×'
+            $$('.ls-rates button').forEach(x => x.classList.toggle('active', +x.dataset.rate === r))
+        })
+        $$('.ls-rates button').forEach(b => b.addEventListener('click', () => { this.listener?.setRate(+b.dataset.rate); $$('.ls-rates button').forEach(x => x.classList.toggle('active', x === b)); $('#voice-rate').value = b.dataset.rate; $('#voice-rate-val').textContent = (+b.dataset.rate).toFixed(2).replace(/0$/, '') + '×' }))
         $('#finish-shelf').addEventListener('click', () => bridge.close())
         $('#finish-stay').addEventListener('click', () => { $('#finish').hidden = true })
         // the body must never scroll: hidden sheets hang below it and a focus-scroll would shift the whole UI

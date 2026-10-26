@@ -168,6 +168,16 @@
   <button data-sel="define">meaning</button><button data-sel="translate">translate</button><button data-sel="highlight">highlight</button><button data-sel="copy">copy</button>
 </div>
 
+<section id="voice-panel" class="panel sheet hidden">
+  <div class="grab"></div>
+  <div class="panel-head"><h2>voice</h2><button class="icon close" data-close="voice-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
+  <div class="panel-body">
+    <div class="rate-row"><span>speed</span><input id="voice-rate" type="range" min="0.6" max="1.8" step="0.05" value="1" aria-label="Speed"><b id="voice-rate-val">1.0×</b></div>
+    <div id="voice-list" class="voice-list"></div>
+    <p id="voice-hint" class="voice-hint"></p>
+  </div>
+</section>
+
 <section id="hl-menu" class="panel sheet hidden">
   <div class="grab"></div>
   <div class="panel-head"><h2>highlight</h2><button class="icon close" data-close="hl-menu" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
@@ -187,6 +197,7 @@
   <button id="ls-prev" class="icon small" aria-label="Previous sentence"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
   <button id="ls-toggle" class="icon play" aria-label="Play or pause"><svg class="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><svg class="i-pause" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></button>
   <button id="ls-next" class="icon small" aria-label="Next sentence"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+  <button id="ls-voice" class="icon small" aria-label="Voice and speed" title="Voice and speed"><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3h2a7 7 0 0 1-6 6.92V21h-2v-3.08A7 7 0 0 1 5 11h2a5 5 0 0 0 10 0z"/></svg></button>
   <div class="ls-rates"><button data-rate="0.8">0.8×</button><button data-rate="1" class="active">1×</button><button data-rate="1.2">1.2×</button><button data-rate="1.5">1.5×</button></div>
   <button id="ls-close" class="icon small close" aria-label="Stop listening"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
 </div>

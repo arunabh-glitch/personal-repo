@@ -13,11 +13,20 @@ const segmentSentences = (text, lang = 'en') => {
     return out
 }
 
+/** Strips things that should not be read aloud: footnote markers, superscript digits, stray markdown emphasis; turns dashes into pauses. */
+export const cleanForSpeech = t => t
+    .replace(/\[\d{1,3}\]/g, '')
+    .replace(/[\u00B9\u00B2\u00B3\u2070-\u2079]+/g, '')
+    .replace(/\s[*_]{1,3}\s/g, ' ')
+    .replace(/\s*[\u2014\u2013]\s*/g, ', ')
+    .replace(/\s{2,}/g, ' ').trim()
+const speakable = t => t && !/^[\d\s.,;:!?'"()\-]*$/.test(t)
+
 const parseSSML = ssml => {
     const doc = new DOMParser().parseFromString(ssml, 'application/xml')
     const segments = []
     let name = null, buf = ''
-    const flush = () => { const t = buf.replace(/\s+/g, ' ').trim(); if (t) segments.push({ name, text: t }); buf = '' }
+    const flush = () => { const t = cleanForSpeech(buf.replace(/\s+/g, ' ')); if (speakable(t)) segments.push({ name, text: t }); buf = '' }
     const walk = node => {
         for (const n of node.childNodes) {
             if (n.nodeType === 3) buf += n.data
@@ -38,6 +47,43 @@ export class Listener extends EventTarget {
         this.rate = +(localStorage.getItem('dogear.listen.rate') || 1)
         this.queue = []; this.pos = 0
         this.synth = globalThis.speechSynthesis
+        this.voiceFailed = false
+        try { this.synth?.addEventListener?.('voiceschanged', () => this.dispatchEvent(new Event('voices'))) } catch { /* ignore */ }
+    }
+
+    // ----- voices -----
+    get #langKey() { return (this.lang || 'en').toLowerCase().split(/[-_]/)[0] }
+    /** Installed voices for the book's language, best first. */
+    voices() {
+        const want = this.#langKey
+        const quality = v => /premium/i.test(v.name) ? 'premium' : /enhanced|neural|wavenet|natural/i.test(v.name) ? 'enhanced' : v.localService === false ? 'online' : ''
+        const rank = q => ({ premium: 3, enhanced: 2, '': 1, online: 0 })[q]
+        return (this.synth.getVoices?.() || [])
+            .filter(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(want))
+            .map(v => ({ uri: v.voiceURI, name: v.name, lang: v.lang, quality: quality(v) }))
+            .sort((a, b) => rank(b.quality) - rank(a.quality) || a.name.localeCompare(b.name))
+    }
+    get voiceURI() { return localStorage.getItem('dogear.listen.voice.' + this.#langKey) || '' }
+    setVoice(uri) {
+        const key = 'dogear.listen.voice.' + this.#langKey
+        if (uri) localStorage.setItem(key, uri); else localStorage.removeItem(key)
+        this.voiceFailed = false
+        if (this.state === 'playing') this.#restart(false)
+    }
+    #voice() {
+        if (this.voiceFailed) return null
+        const uri = this.voiceURI
+        return uri ? (this.synth.getVoices?.() || []).find(v => v.voiceURI === uri) || null : null
+    }
+    /** Speaks one sample sentence with the chosen voice (pauses reading first). */
+    preview(text) {
+        if (this.state === 'playing') this.pause()
+        this.synth.cancel()
+        const u = new SpeechSynthesisUtterance(text)
+        u.rate = this.rate; u.lang = this.lang || 'en'
+        const v = this.#voice(); if (v) u.voice = v
+        this.previewUtterance = u
+        setTimeout(() => this.synth.speak(u), 80)
     }
     get supported() { return !!this.synth && 'SpeechSynthesisUtterance' in globalThis }
 
@@ -114,7 +160,7 @@ export class Listener extends EventTarget {
         let text = ''; const spans = []
         for (const item of tc.items) { spans.push({ start: text.length, end: text.length + item.str.length }); text += item.str + (item.hasEOL ? '\n' : ' ') }
         this.pdfSpans = spans
-        this.queue = segmentSentences(text, this.lang).map(s => ({ name: null, text: s.text, start: s.start, end: s.end }))
+        this.queue = segmentSentences(text, this.lang).map(s => ({ name: null, text: cleanForSpeech(s.text), start: s.start, end: s.end })).filter(s => speakable(s.text))
         this.pos = 0
         if (this.pdf.current !== n) this.pdf.goToPage(n)
     }
@@ -139,7 +185,9 @@ export class Listener extends EventTarget {
         if (manual && this.state !== 'playing') this.#setState('playing')
         const u = new SpeechSynthesisUtterance(seg.text)
         u.rate = this.rate; u.lang = this.lang || 'en'
-        // No explicit voice: on iOS a listed-but-not-installed voice plays silence and never ends. The system picks one for the language.
+        // Only a voice the reader picked; an automatically chosen voice can be listed yet uninstalled, which plays silence forever.
+        const voice = this.#voice()
+        if (voice) u.voice = voice
         const advance = () => { if (this.state === 'playing' && this.current === u) { clearTimeout(this.watchdog); this.pos++; this.#speakCurrent() } }
         u.onend = () => { this.stalls = 0; advance() }
         u.onerror = e => {
@@ -157,7 +205,11 @@ export class Listener extends EventTarget {
         const stalled = () => {
             if (this.current !== u || this.state !== 'playing') return
             if (this.stallAt !== this.pos) { this.stallAt = this.pos; this.stallTries = 0 }
-            if (this.stallTries++ < 1) { this.synth.cancel(); this.#unstick(); setTimeout(() => this.#speakCurrent(true), 150); return }
+            if (this.stallTries++ < 1) {
+                // a chosen voice that never finishes is the usual culprit: retry with the device default
+                if (this.#voice()) { this.voiceFailed = true; this.dispatchEvent(new Event('voice-fallback')) }
+                this.synth.cancel(); this.#unstick(); setTimeout(() => this.#speakCurrent(true), 150); return
+            }
             this.stalls = (this.stalls || 0) + 1
             if (this.stalls >= 3) { this.stop(); this.dispatchEvent(new CustomEvent('error', { detail: 'stalled' })); return }
             advance()
