@@ -56,13 +56,12 @@ export class Companion {
     }
     hop() { this.#play('is-happy', 800) }
     #play(cls, ms) { if (this.reduceMotion) return; this.figure.classList.remove(cls); void this.figure.offsetWidth; this.figure.classList.add(cls); setTimeout(() => this.figure.classList.remove(cls), ms) }
-    // asleep or lying down: stir under the blanket, sit up with a stretch, then back to the book
+    // asleep or lying down: a stir where she is, then straight back to the book with a hop
     #wakeUp(after) {
         if (this.waking) return
         this.waking = true; this.asleep = false; clearTimeout(this.poseTimer)
-        this.#play('is-stir', 900)
-        setTimeout(() => { setPose(this.figure, 'lying'); this.#play('is-stretch', 900) }, this.reduceMotion ? 0 : 850)
-        setTimeout(() => { this.waking = false; setPose(this.figure, 'reading'); this.hop(); if (this.late) this.poseTimer = setTimeout(() => setPose(this.figure, 'blanket'), 12000); after?.() }, this.reduceMotion ? 0 : 1700)
+        this.#play('is-stir', 700)
+        setTimeout(() => { this.waking = false; setPose(this.figure, 'reading'); this.hop(); if (this.late) this.poseTimer = setTimeout(() => setPose(this.figure, 'blanket'), 12000); after?.() }, this.reduceMotion ? 0 : 650)
     }
     say(text, ms = 3600, { chat = false } = {}) {
         if (!this.enabled || !text) return false
