@@ -110,6 +110,8 @@ export class Companion {
         if (!this.enabled) return
         if (this.asleep || this.late) { this.say(pick(LINES.tapSleepy), 2500); if (this.asleep) this.#wakeIfNeeded(); return }
         this.pose('happy', 1800); this.hop(); this.say(pick(LINES.tap), 2200)
+        // when a chat is wired up, a tap says hi and then opens the conversation
+        if (this.onTap) { clearTimeout(this.tapTimer); this.tapTimer = setTimeout(() => this.onTap(), 650) }
     }
     destroy() { clearInterval(this.timer) }
 }

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="color-scheme" content="light dark">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' blob: 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; media-src 'self' blob: data: https://api.dictionaryapi.dev https://*.wiktionary.org https://upload.wikimedia.org; connect-src 'self' blob: data: https://api.dictionaryapi.dev https://en.wiktionary.org https://api.mymemory.translated.net; frame-src blob: data:; object-src blob: data:; worker-src 'self' blob:; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' blob: 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; media-src 'self' blob: data: https://api.dictionaryapi.dev https://*.wiktionary.org https://upload.wikimedia.org; connect-src 'self' blob: data: https://api.dictionaryapi.dev https://en.wiktionary.org https://api.mymemory.translated.net https://api.anthropic.com; frame-src blob: data:; object-src blob: data:; worker-src 'self' blob:; form-action 'none';">
 <title>Lumi</title>
 <link rel="stylesheet" href="reader.css">
 </head>
@@ -29,6 +29,9 @@
     <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
   </button>
   <div id="title" class="title"></div>
+  <button id="btn-chat" class="icon" aria-label="Ask Lumi">
+    <svg viewBox="0 0 24 24"><path d="M12 2 9.6 8.4 3 10.8l6.6 2.4L12 19.6l2.4-6.4 6.6-2.4-6.6-2.4zM19 15l-1.2 3.3L14.5 19.5l3.3 1.2L19 24l1.2-3.3 3.3-1.2-3.3-1.2z"/></svg>
+  </button>
   <button id="btn-search" class="icon" aria-label="Search">
     <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
   </button>
@@ -194,10 +197,30 @@
     <div class="row-inline">
       <span class="hl-dots"><button class="dot lime" data-hlm="lime"></button><button class="dot pink" data-hlm="pink"></button><button class="dot blue" data-hlm="blue"></button><button class="dot sun" data-hlm="sun"></button></span>
       <button id="hlm-define" class="mini">meaning</button>
+      <button id="hlm-ask" class="mini">ask lumi</button>
       <button id="hlm-delete" class="mini danger">delete</button>
       <button id="hlm-save" class="btn small">save</button>
     </div>
   </div>
+</section>
+
+<section id="chat-panel" class="panel sheet chat hidden" aria-label="Talk to Lumi">
+  <div class="grab"></div>
+  <div class="panel-head chat-head">
+    <div class="chat-who"><div><h2>lumi</h2><small class="sub">about this book · no spoilers</small></div></div>
+    <button id="chat-settings" class="icon" aria-label="Chat settings"><svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6a6 6 0 1 0 5.65 8H17v4h4v-4h2v-4H12.65zM7 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg></button>
+    <button class="icon close" data-close="chat-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+  </div>
+  <div id="chat-setup" class="chat-setup" hidden>
+    <p>lumi talks with a Claude model. paste your own Claude API key: it stays on this device and goes straight to anthropic.com, and you pay for what you use. only the pages you’ve already read are sent.</p>
+    <div class="chat-key-row"><input id="chat-key" type="password" placeholder="sk-ant-…" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Claude API key"><button id="chat-key-save" class="btn small" type="button">save</button></div>
+    <div id="chat-models" class="chips"></div>
+    <div class="row-inline chat-setup-foot"><a id="chat-key-link" class="link" href="https://platform.claude.com" target="_blank" rel="noopener">get a key ↗</a><button id="chat-clear" class="mini" type="button">clear this chat</button><button id="chat-key-forget" class="mini danger" type="button" hidden>forget key</button></div>
+  </div>
+  <div id="chat-log" class="chat-log panel-body" aria-live="polite"></div>
+  <div id="chat-quote" class="chat-quote" hidden><span id="chat-quote-text"></span><button id="chat-quote-x" class="icon" type="button" aria-label="Drop passage">×</button></div>
+  <div id="chat-chips" class="chat-chips"></div>
+  <form id="chat-form" class="chat-form"><textarea id="chat-input" rows="1" placeholder="ask lumi about the book…" enterkeyhint="send" autocomplete="off"></textarea><button id="chat-send" class="icon send" type="submit" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></form>
 </section>
 
 <div id="listen-bar" class="listen-bar" hidden>

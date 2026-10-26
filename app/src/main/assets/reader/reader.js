@@ -6,6 +6,7 @@ import { Overlayer } from './foliate/overlayer.js'
 import { translate, LANGS, defaultTarget } from './translate.js'
 import { Listener } from './listen.js'
 import { Companion } from './companion.js'
+import { LumiChat } from './chat.js'
 
 const $ = s => document.querySelector(s)
 const $$ = s => Array.from(document.querySelectorAll(s))
@@ -134,6 +135,19 @@ const wordRangeAt = (doc, x, y) => {
     const range = doc.createRange(); range.setStart(node, st); range.setEnd(node, en)
     return range
 }
+// Plain text of a document up to the end of `range` (or all of it), with line breaks where the blocks are.
+const BLOCKS = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'BR', 'TR', 'BLOCKQUOTE', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'TD', 'DT', 'DD', 'PRE', 'HR', 'FIGCAPTION', 'ASIDE'])
+const textUpTo = (doc, range) => {
+    const parts = [], walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT)
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (n.nodeType === 1) { if (BLOCKS.has(n.localName.toUpperCase())) parts.push('\n'); continue }
+        if (n.parentNode?.closest?.('script, style, template')) continue
+        if (range && n === range.endContainer) { parts.push(n.data.slice(0, range.endOffset)); break }
+        if (range && range.comparePoint(n, 0) === 1) break
+        parts.push(n.data)
+    }
+    return parts.join('').replace(/[ \t\u00a0]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{2,}/g, '\n').trim()
+}
 const COARSE = matchMedia('(pointer: coarse)').matches
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms) } }
 
@@ -176,6 +190,12 @@ class Reader {
         if (this.kind !== 'pdf') Listener.preload().catch(() => {})
         this.companion = new Companion($('#companion'), { enabled: this.settings.companion !== false, reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches })
         setTimeout(() => this.companion.greet(this.lastFraction ?? 0), 600)
+        this.companion.onTap = () => this.openChat()
+        this.chat = new LumiChat($('#chat-panel'), {
+            bookId: this.info.id || this.info.fileName || 'book', getContext: () => this.#chatContext(),
+            open: () => this.openPanel('chat-panel'), close: () => this.closePanels(), openExternal: u => bridge.openExternal(u),
+        })
+        this.chat.toast = (m, ms) => this.toast(m, ms)
         $('#loading').hidden = true
         bridge.onReady()
         bridge.keepScreenOn(this.settings.keepScreenOn)
@@ -963,6 +983,47 @@ class Reader {
         clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => t.hidden = true, ms)
     }
 
+    // ---------- talk to lumi ----------
+    openChat(quote = null) { this.showBars(false); this.chat?.open(quote) }
+
+    /** What Lumi gets to know: the book, where the reader is, and the text up to there (never past it). */
+    async #chatContext() {
+        const author = formatContributor(this.book?.metadata?.author) || this.info.author || ''
+        let excerpt = ''
+        try { excerpt = this.kind === 'pdf' ? await this.#pdfExcerpt() : await this.#bookExcerpt() } catch (e) { console.warn('excerpt', e) }
+        const highlights = (this.highlights || []).slice(-6).map(h => h.text).filter(Boolean).map(t => t.slice(0, 240))
+        const words = (await hostStore.listWords().catch(() => [])).filter(w => w.bookId === this.info?.id).slice(-10).map(w => w.word)
+        return { title: $('#title').textContent, author, fraction: this.lastFraction ?? 0, chapter: $('#status-left').textContent, excerpt, highlights, words }
+    }
+    async #bookExcerpt(limit = 9000) {
+        const content = this.view?.renderer.getContents()[0]
+        if (!content) return ''
+        const doc = content.doc
+        let text = ''
+        try {
+            const vis = this.view.lastLocation?.range
+            text = textUpTo(doc, vis && vis.endContainer.getRootNode() === doc ? vis : null)
+        } catch { text = String(doc.body?.textContent ?? '').replace(/\s+/g, ' ').trim() }
+        // just started a chapter? pad with the end of the previous ones so lumi remembers what led here
+        let idx = (content.index ?? 0) - 1
+        while (text.length < limit * 0.6 && idx >= 0) {
+            const sec = this.book?.sections?.[idx--]
+            if (!sec?.createDocument || sec.linear === 'no') continue
+            try { const d = await sec.createDocument(); text = textUpTo(d, null) + '\n\n' + text } catch { break }
+        }
+        return text.length > limit ? '…' + text.slice(-limit) : text
+    }
+    async #pdfExcerpt(limit = 9000) {
+        const n = this.pdf?.current ?? 1, out = []
+        for (const p of [n - 1, n]) {
+            if (p < 1 || p > this.pdf.total) continue
+            const tc = await (await this.pdf.pdf.getPage(p)).getTextContent()
+            out.push(tc.items.map(i => i.str + (i.hasEOL ? '\n' : ' ')).join('').replace(/[ \t]+/g, ' ').trim())
+        }
+        const text = out.join('\n\n')
+        return text.length > limit ? '…' + text.slice(-limit) : text
+    }
+
     // ---------- chrome ----------
     showBars(v) {
         this.barsVisible = v
@@ -997,6 +1058,7 @@ class Reader {
         $('#error-back').addEventListener('click', () => bridge.close())
         $('#btn-toc').addEventListener('click', () => this.openPanel('toc-panel'))
         $('#btn-search').addEventListener('click', () => this.openPanel('search-panel'))
+        $('#btn-chat').addEventListener('click', () => this.openChat())
         $('#btn-settings').addEventListener('click', () => { this.#syncSettingsUI(); this.openPanel('settings-panel') })
         $('#scrim').addEventListener('click', () => this.closePanels())
         $$('[data-close]').forEach(b => b.addEventListener('click', () => this.closePanels()))
@@ -1042,6 +1104,7 @@ class Reader {
         $$('#hl-menu [data-hlm]').forEach(d => d.addEventListener('click', () => { this.hlmColor = d.dataset.hlm; $$('#hl-menu .dot').forEach(x => x.classList.toggle('active', x === d)) }))
         $('#hlm-save').addEventListener('click', () => this.#saveHighlightMenu())
         $('#hlm-delete').addEventListener('click', () => this.#deleteHighlightMenu())
+        $('#hlm-ask').addEventListener('click', () => { const t = this.hlmTarget?.text || $('#hlm-text').textContent; this.closePanels(); this.openChat(t) })
         $('#hlm-define').addEventListener('click', () => { const t = this.hlmTarget?.text || $('#hlm-text').textContent; this.closePanels(); this.define(t.split(/\s+/).slice(0, 4).join(' ')) })
         // listen
         $('#btn-listen').addEventListener('click', () => this.toggleListen())
