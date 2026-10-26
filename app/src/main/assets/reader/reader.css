@@ -159,6 +159,7 @@ body[data-theme="gray"] .dict-title h2, body[data-theme="dark"] .dict-title h2 {
 .dict-syn { margin: 8px 0 2px; display: flex; flex-wrap: wrap; gap: 6px; }
 .dict-chip { border: 2px solid var(--line); background: var(--paper); border-radius: 999px; padding: 4px 11px; font-size: 13px; font-weight: 600; color: var(--ink); }
 .dict-chip:active { background: var(--sun); color: #1e1636; }
+.dict-head, .dict-tabs, .dict-foot, .panel.dict .grab { flex: none; }
 .dict-foot { display: flex; align-items: center; justify-content: space-between; padding: 8px 22px 12px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--hair); font-weight: 600; }
 .link { background: none; border: 0; color: var(--blue); font-weight: 800; font-size: 13px; padding: 6px 0; }
 .dict-empty { color: var(--muted); font-size: 15px; line-height: 1.5; margin: 10px 0 14px; }
@@ -186,11 +187,11 @@ body[data-theme="gray"] .dict-title h2, body[data-theme="dark"] .dict-title h2 {
 .dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); padding: 0; transition: transform 0.15s cubic-bezier(.34,1.56,.64,1); }
 .dot:active, .dot.active { transform: scale(1.2); box-shadow: 2px 2px 0 var(--ink); }
 .dot.lime { background: #c6f24e; } .dot.pink { background: #ff5ca8; } .dot.blue { background: #8fb0ff; } .dot.sun { background: #ffd23f; }
-.dict-actions-row { display: flex; align-items: center; gap: 6px; padding: 8px 14px 10px; flex-wrap: nowrap; overflow-x: auto; border-top: 1px solid var(--hair); scrollbar-width: none; }
+.dict-actions-row { display: flex; align-items: center; gap: 6px; padding: 10px 18px 10px; flex: none; min-height: 48px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; border-top: 1px solid var(--hair); scrollbar-width: none; }
 .dict-actions-row::-webkit-scrollbar { display: none; }
 .dict-actions-row .mini { padding: 5px 10px; font-size: 12px; white-space: nowrap; flex: none; }
 .dict-actions-row .dot { width: 24px; height: 24px; flex: none; }
-.dict-actions-row .hl-dots { gap: 6px; margin-right: 2px; flex: none; }
+.dict-actions-row .hl-dots { display: flex; gap: 8px; margin-right: 4px; padding: 2px 0 2px 2px; flex: none; }
 .mini { border: 2px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; }
 .mini:active { background: var(--sun); color: #1e1636; }
 .mini.danger { color: var(--pink); }
