@@ -796,19 +796,22 @@ class Reader {
     // ---------- listen ----------
     async toggleListen() {
         if (this.listener && this.listener.state !== 'idle') { this.listener.toggle(); return }
-        this.listener ??= new Listener({
-            view: this.kind === 'pdf' ? null : this.view, pdf: this.kind === 'pdf' ? this.pdf : null, lang: this.lang || 'en',
-            onHighlight: target => this.#ttsHighlight(target),
-        })
+        if (!this.listener) {
+            this.listener = new Listener({
+                view: this.kind === 'pdf' ? null : this.view, pdf: this.kind === 'pdf' ? this.pdf : null, lang: this.lang || 'en',
+                onHighlight: target => this.#ttsHighlight(target),
+            })
+            this.listener.addEventListener('state', e => {
+                const st = e.detail
+                $('#listen-bar').hidden = st === 'idle'
+                $('#listen-bar').classList.toggle('playing', st === 'playing')
+                $('#btn-listen').classList.toggle('on', st !== 'idle')
+                if (st === 'idle') this.#ttsHighlight(null)
+            })
+            this.listener.addEventListener('done', () => this.toast('end of book'))
+            this.listener.addEventListener('error', () => this.toast('speech isn’t available right now'))
+        }
         if (!this.listener.supported) { this.toast('no voices on this device'); return }
-        this.listener.addEventListener('state', e => {
-            const st = e.detail
-            $('#listen-bar').hidden = st === 'idle'
-            $('#listen-bar').classList.toggle('playing', st === 'playing')
-            $('#btn-listen').classList.toggle('on', st !== 'idle')
-            if (st === 'idle') this.#ttsHighlight(null)
-        })
-        this.listener.addEventListener('done', () => this.toast('end of book'))
         $$('.ls-rates button').forEach(x => x.classList.toggle('active', +x.dataset.rate === this.listener.rate))
         this.showBars(false)
         try { await this.listener.start() } catch (e) { this.toast(e.message) }
@@ -826,11 +829,16 @@ class Reader {
             return
         }
         if (this.ttsAnnotation) { try { this.view.deleteAnnotation(this.ttsAnnotation) } catch { /* ignore */ } this.ttsAnnotation = null }
-        if (!target) return
+        if (!target) {
+            // scrolling to sentences leaves a collapsed caret behind; make sure no selection lingers, or taps would be ignored
+            for (const c of this.view?.renderer.getContents() ?? []) { try { const sel = c.doc.getSelection(); if (sel?.rangeCount) sel.removeAllRanges() } catch { /* ignore */ } }
+            return
+        }
         const index = this.view.renderer.getContents()[0]?.index ?? 0
         this.ttsAnnotation = { value: this.view.getCFI(index, target) }
         this.view.addAnnotation(this.ttsAnnotation).catch?.(() => {})
-        this.view.renderer.scrollToAnchor?.(target, true)
+        // navigate (not select): selecting the sentence would leave a selection that swallows the next tap
+        this.view.renderer.scrollToAnchor?.(target, false)
     }
 
     // ---------- reading sessions & finishing ----------

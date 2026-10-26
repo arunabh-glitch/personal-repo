@@ -41,25 +41,46 @@ export class Listener extends EventTarget {
     }
     get supported() { return !!this.synth && 'SpeechSynthesisUtterance' in globalThis }
 
+    // iOS: speech output follows the ringer switch unless a media element is playing, which moves the
+    // page to the "playback" audio session. A looping second of silence does that while we read aloud.
+    #silentAudio() {
+        const sr = 8000, n = 8000, buf = new Uint8Array(44 + n), dv = new DataView(buf.buffer)
+        const str = (o, t) => { for (let i = 0; i < t.length; i++) buf[o + i] = t.charCodeAt(i) }
+        str(0, 'RIFF'); dv.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt '); dv.setUint32(16, 16, true)
+        dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, sr, true); dv.setUint32(28, sr, true)
+        dv.setUint16(32, 1, true); dv.setUint16(34, 8, true); str(36, 'data'); dv.setUint32(40, n, true); buf.fill(128, 44)
+        const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })))
+        a.loop = true; a.setAttribute('playsinline', ''); a.preload = 'auto'
+        return a
+    }
+    #audioOn() { try { this.keepAlive ??= this.#silentAudio(); this.keepAlive.play()?.catch?.(() => {}) } catch { /* no audio element support */ } }
+    #audioOff() { try { this.keepAlive?.pause() } catch { /* ignore */ } }
+    // iOS only speaks if the first utterance of a page is queued inside a user gesture; our start() awaits before
+    // the first real sentence, so queue a silent one synchronously here.
+    #prime() { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; this.synth.speak(u) } catch { /* ignore */ } }
+    // cancel() immediately followed by speak() drops the utterance on iOS; restart after a tick.
+    #restart(manual) { this.synth.cancel(); clearTimeout(this.restartTimer); this.restartTimer = setTimeout(() => this.#speakCurrent(manual), 80) }
+
     #setState(s) { this.state = s; this.dispatchEvent(new CustomEvent('state', { detail: s })) }
 
-    setRate(r) { this.rate = Math.min(2, Math.max(0.5, r)); localStorage.setItem('dogear.listen.rate', String(this.rate)); if (this.state === 'playing') { this.synth.cancel(); this.#speakCurrent() } }
+    setRate(r) { this.rate = Math.min(2, Math.max(0.5, r)); localStorage.setItem('dogear.listen.rate', String(this.rate)); if (this.state === 'playing') this.#restart(false) }
 
     async start() {
         if (!this.supported) throw new Error('This device has no text-to-speech voices.')
-        this.synth.cancel()
+        this.#audioOn()
+        if (this.synth.speaking || this.synth.pending) this.synth.cancel(); else this.#prime()
         if (this.pdf) await this.#loadPdfPage(this.pdf.current)
         else await this.#loadSection(true)
         if (!this.queue.length) { this.stop(); return }
         this.#setState('playing')
         this.#speakCurrent()
     }
-    pause() { if (this.state !== 'playing') return; this.synth.cancel(); this.#setState('paused') }
-    resume() { if (this.state !== 'paused') return; this.#setState('playing'); this.#speakCurrent() }
+    pause() { if (this.state !== 'playing') return; this.synth.cancel(); this.#audioOff(); this.#setState('paused') }
+    resume() { if (this.state !== 'paused') return; this.#audioOn(); this.#setState('playing'); this.#speakCurrent() }
     toggle() { this.state === 'playing' ? this.pause() : this.state === 'paused' ? this.resume() : this.start() }
-    stop() { this.synth?.cancel(); this.queue = []; this.pos = 0; this.onHighlight(null); this.#setState('idle') }
-    next() { if (this.state === 'idle') return; this.synth.cancel(); this.pos++; this.#speakCurrent(true) }
-    prev() { if (this.state === 'idle') return; this.synth.cancel(); this.pos = Math.max(0, this.pos - 1); this.#speakCurrent(true) }
+    stop() { clearTimeout(this.restartTimer); clearTimeout(this.watchdog); this.synth?.cancel(); this.#audioOff(); this.queue = []; this.pos = 0; this.onHighlight(null); this.#setState('idle') }
+    next() { if (this.state === 'idle') return; this.pos++; this.#restart(true) }
+    prev() { if (this.state === 'idle') return; this.pos = Math.max(0, this.pos - 1); this.#restart(true) }
 
     // ----- reflowable books (foliate) -----
     async #loadSection(fromVisible) {
@@ -125,10 +146,20 @@ export class Listener extends EventTarget {
         u.rate = this.rate; u.lang = this.lang || 'en'
         const voice = this.#voice()
         if (voice) u.voice = voice
-        u.onend = () => { if (this.state === 'playing' && this.current === u) { this.pos++; this.#speakCurrent() } }
-        u.onerror = e => { if (e.error === 'interrupted' || e.error === 'canceled') return; console.warn('tts', e.error); if (this.state === 'playing' && this.current === u) { this.pos++; this.#speakCurrent() } }
+        const advance = () => { if (this.state === 'playing' && this.current === u) { clearTimeout(this.watchdog); this.pos++; this.#speakCurrent() } }
+        u.onend = advance
+        u.onerror = e => {
+            if (e.error === 'interrupted' || e.error === 'canceled') return
+            console.warn('tts', e.error)
+            if (e.error === 'not-allowed' || e.error === 'audio-busy' || e.error === 'synthesis-unavailable') { this.stop(); this.dispatchEvent(new CustomEvent('error', { detail: e.error })); return }
+            advance()
+        }
         this.current = u
         this.synth.speak(u)
+        // iOS sometimes never fires onend (screen lock, interruptions); move on once the sentence must be over
+        clearTimeout(this.watchdog)
+        const expect = () => { if (this.current !== u || this.state !== 'playing') return; if (this.synth.speaking) { this.watchdog = setTimeout(expect, 2000); return } advance() }
+        this.watchdog = setTimeout(expect, seg.text.length * 100 / this.rate + 2500)
     }
     #voice() {
         const voices = this.synth.getVoices?.() || []
