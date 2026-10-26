@@ -81,7 +81,9 @@ const fromWiktionary = async word => {
 }
 
 /** Returns { word, phonetic, audio, meanings, source, url } or null when the word is unknown. Throws when offline. */
-export const lookup = async raw => {
+const INFLECTION_RE = /^\s*(plural|past tense|past participle|present participle|gerund|comparative|superlative|simple past|third-person singular(?: simple present(?: indicative)?)?|(?:[\w-]+ )?(?:form|tense|participle)) (?:form )?of ([\p{L}'’-]+)/iu
+
+export const lookup = async (raw, depth = 0) => {
     const word = normalizeWord(raw)
     if (!word) return null
     const key = word.toLowerCase()
@@ -90,8 +92,16 @@ export const lookup = async raw => {
     for (const c of candidates(word)) {
         for (const src of [fromDictionaryApi, fromWiktionary]) {
             try {
-                const r = await src(c)
-                if (r) { cache[key] = r; saveCache(); return r }
+                let r = await src(c)
+                if (!r) continue
+                // "plural of terrorist" → show the root word's own meanings as well.
+                const first = r.meanings[0]?.defs[0]?.def || ''
+                const m = INFLECTION_RE.exec(first)
+                if (m && depth === 0 && m[2].toLowerCase() !== key) {
+                    const root = await lookup(m[2], 1).catch(() => null)
+                    if (root) r = { ...root, word: r.word, inflection: first.replace(/\.$/, ''), phonetic: r.phonetic || root.phonetic, audio: r.audio || root.audio }
+                }
+                cache[key] = r; saveCache(); return r
             } catch (e) { lastError = e }
         }
     }

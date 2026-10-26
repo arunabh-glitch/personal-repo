@@ -496,9 +496,23 @@ class Reader {
         }, 450)
     }
 
+    // Host-coordinate vertical centre of the pending range (iframe ranges are offset by their frame).
+    #pendingY() {
+        const p = this.pending
+        if (!p?.range) return null
+        const r = p.range.getBoundingClientRect()
+        const frame = p.doc?.defaultView?.frameElement
+        if (!frame) return r.top + r.height / 2
+        const fr = frame.getBoundingClientRect()
+        const scale = frame.clientHeight ? fr.height / frame.clientHeight : 1
+        return fr.top + (r.top + r.height / 2) * scale
+    }
     async define(phrase) {
         const word = normalizeWord(phrase)
         if (!word) return
+        // Open the card away from the word: from the top when the word sits in the lower half.
+        const y = this.#pendingY()
+        $('#dict-card').classList.toggle('top', y != null && y > window.innerHeight * 0.5)
         this.dictWord = word
         this.dictPhrase = phrase.replace(/\s+/g, ' ').trim()
         this.dictOpen = true
@@ -529,7 +543,7 @@ class Reader {
 
     #renderDefinition(r) {
         $('#dict-word').textContent = r.word
-        $('#dict-phon').textContent = r.phonetic || ''
+        $('#dict-phon').textContent = [r.phonetic, r.inflection].filter(Boolean).join(' · ')
         $('#dict-source').textContent = r.source
         const speakBtn = $('#dict-speak')
         speakBtn.hidden = !(r.audio || 'speechSynthesis' in window)
