@@ -225,6 +225,7 @@ body[data-theme="gray"] .dict-title h2, body[data-theme="dark"] .dict-title h2 {
 .ls-rates { display: flex; gap: 2px; margin-left: auto; }
 .ls-rates button { border: 0; background: transparent; border-radius: 999px; padding: 6px 8px; font-size: 12px; font-weight: 800; color: var(--muted); }
 .ls-rates button.active { background: var(--lime); color: #1e1636; }
+#ls-silent[aria-pressed="true"] { background: var(--sun); } #ls-silent[aria-pressed="true"] .slash { display: none; }
 #btn-listen.on { background: var(--blue); color: #fff; }
 
 /* finish celebration */
