@@ -63,6 +63,13 @@ h1, h2 { font-family: var(--display); margin: 0; letter-spacing: -0.02em; font-v
 .pose-stack { width: 76px; margin-right: 6px; }
 .find-hero { width: 150px; margin: 28px auto 0; }
 .help-hero { width: 170px; margin: 0 auto 10px; }
+.continue-card { position: relative; overflow: visible; }
+.cc-lumi { position: absolute; right: 14px; top: -26px; width: 58px; }
+.hint-lumi { width: 60px; flex: none; }
+.words-lumi { width: 120px; margin: 0 auto 10px; }
+.quiz-lumi { width: 120px; margin: 0 auto; }
+.find-found { display: flex; align-items: center; gap: 12px; padding: 4px 4px 10px; font-family: var(--display); font-weight: 800; font-size: 15px; }
+.found-lumi { width: 64px; }
 @media (prefers-reduced-motion: reduce) { .lumi, .lumi *, .brand-mark * { animation: none !important; transition: none !important; } }
 h1 { font-size: 34px; font-weight: 800; line-height: 1; }
 .hl { background: linear-gradient(transparent 52%, var(--lime) 52%, var(--lime) 92%, transparent 92%); padding: 0 4px; }

@@ -172,12 +172,19 @@ $('#sheet').addEventListener('click', async e => {
 })
 
 const POSES = {"reading": {"w": 406, "h": 396, "eyes": [43.8, 45.1], "spark": [88.2, 13.3], "blink": true}, "lying": {"w": 298, "h": 204, "eyes": [30.9, 56.9], "spark": [64.1, 13.7], "blink": true}, "happy": {"w": 251, "h": 217, "eyes": [53.0, 36.6], "spark": [50.4, 36.4], "blink": false}, "stack": {"w": 257, "h": 230, "eyes": [57.4, 32.4], "spark": [82.3, 13.7], "blink": true}, "blanket": {"w": 326, "h": 208, "eyes": [55.5, 48.6], "spark": [78.5, 24.0], "blink": false}, "thinking": {"w": 241, "h": 259, "eyes": [46.5, 43.4], "spark": [80.5, 16.2], "blink": true}}
+const lumiHTML = (name, cls = '') => { const m = POSES[name]; return `<div class="lumi ${cls}" data-pose="${name}"${m.blink ? ' data-blink' : ''} style="--eyes:${m.eyes[0]}% ${m.eyes[1]}%;--spark:${m.spark[0]}% ${m.spark[1]}%;aspect-ratio:${m.w}/${m.h}">` + ['body', 'eyes', 'spark'].map(l => `<img class="l-${l}" src="reader/brand/lumi-${name}-${l}.png" alt="" width="${m.w}" height="${m.h}">`).join('') + '</div>' }
 const setPose = (el, name) => {
     const m = POSES[name]; if (!el || !m || el.dataset.pose === name) return
     el.dataset.pose = name; el.toggleAttribute('data-blink', m.blink)
     el.style.setProperty('--eyes', `${m.eyes[0]}% ${m.eyes[1]}%`); el.style.setProperty('--spark', `${m.spark[0]}% ${m.spark[1]}%`); el.style.aspectRatio = `${m.w}/${m.h}`
     for (const layer of ['body', 'eyes', 'spark']) { const img = el.querySelector('.l-' + layer); img.src = `reader/brand/lumi-${name}-${layer}.png`; img.width = m.w; img.height = m.h }
 }
+const isLate = () => { const h = new Date().getHours(); return h >= 23 || h < 5 }
+// Lumi around the shelf: peeking over the continue card, lying by the install hint, thinking on an empty word list, happy after a quiz
+$('#continue-card')?.insertAdjacentHTML('beforeend', lumiHTML('reading', 'cc-lumi'))
+{ const st = $('#install-hint .sticker'); if (st) { const d = document.createElement('div'); d.innerHTML = lumiHTML('lying', 'hint-lumi'); st.replaceWith(d.firstChild) } }
+$('#words-empty')?.insertAdjacentHTML('afterbegin', lumiHTML('thinking', 'words-lumi'))
+$('#quiz-done')?.insertAdjacentHTML('afterbegin', lumiHTML('happy', 'quiz-lumi'))
 // ---- Lumi's moods: reading by default, happy when something good happens, under a blanket when you've been away ----
 const mascotLife = () => {
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -189,10 +196,11 @@ const mascotLife = () => {
         setPose(art(), name)
         const el = art(); if (el && !still) { el.classList.remove('is-happy'); void el.offsetWidth; el.classList.add('is-happy') }
         $('.brand-mark')?.classList.add('is-happy')
-        timer = setTimeout(() => { setPose(art(), asleep ? 'blanket' : 'reading'); art()?.classList.remove('is-happy'); $('.brand-mark')?.classList.remove('is-happy') }, ms)
+        timer = setTimeout(() => { setPose(art(), asleep || isLate() ? 'blanket' : 'reading'); art()?.classList.remove('is-happy'); $('.brand-mark')?.classList.remove('is-happy') }, ms)
     }
     const nap = () => { asleep = true; setPose(art(), 'blanket') }
-    const wake = () => { if (!asleep) return; asleep = false; setPose(art(), 'reading') }
+    const wake = () => { if (!asleep) return; asleep = false; setPose(art(), isLate() ? 'blanket' : 'reading') }
+    if (isLate()) setPose(art(), 'blanket')
     setInterval(() => { if (document.visibilityState === 'visible' && !asleep && Date.now() - lastTouch > 60000) nap() }, 5000)
     document.addEventListener('pointerdown', () => { lastTouch = Date.now(); if (asleep) wake() }, { passive: true })
     $('.brand-mark')?.addEventListener('click', () => act('happy'))
@@ -201,7 +209,7 @@ const mascotLife = () => {
 }
 const mascot = mascotLife()
 // Lumi thinks in the find panel until real results arrive
-{ const res = $('#find-results'), hero = $('.find-hero'); if (res && hero) new MutationObserver(() => { hero.hidden = !!res.querySelector('button, article, .find-item') }).observe(res, { childList: true }) }
+{ const res = $('#find-results'), hero = $('.find-hero'); if (res && hero) new MutationObserver(() => { hero.hidden = !!res.querySelector('.find-item') }).observe(res, { childList: true }) }
 // size the page to the visible viewport (Android browsers can report dynamic viewport units taller than what is visible)
 const fitViewport = () => { const h = window.visualViewport?.height || window.innerHeight; if (h > 200) document.documentElement.style.setProperty('--vvh', Math.round(h) + 'px') }
 fitViewport(); window.visualViewport?.addEventListener('resize', fitViewport); window.addEventListener('resize', fitViewport)
@@ -361,6 +369,7 @@ const runFind = async reset => {
         const { items, more } = await catalogMod.SOURCES[findSrc].search($('#find-q').value, findPage)
         if (reset) res.textContent = ''
         if (!items.length && reset) res.innerHTML = '<p class="find-status">nothing found. try another word?</p>'
+        if (items.length && reset) res.insertAdjacentHTML('afterbegin', `<div class="find-found">${lumiHTML('stack', 'found-lumi')}<span>${items.length}${more ? '+' : ''} books found</span></div>`)
         for (const it of items) {
             const row = document.createElement('div'); row.className = 'find-item'
             row.innerHTML = `<img alt="" loading="lazy"${it.cover ? ` src="${esc(it.cover)}"` : ''}><div class="fi-text"><div class="fi-t">${esc(it.title)}</div><div class="fi-a">${esc(it.author || '')}${it.language ? ` · ${esc(it.language)}` : ''}</div></div><button class="get">add</button>`

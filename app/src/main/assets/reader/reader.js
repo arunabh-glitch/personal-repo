@@ -5,12 +5,13 @@ import { lookup, speak, selectedPhrase, normalizeWord } from './dictionary.js'
 import { Overlayer } from './foliate/overlayer.js'
 import { translate, LANGS, defaultTarget } from './translate.js'
 import { Listener } from './listen.js'
+import { Companion } from './companion.js'
 
 const $ = s => document.querySelector(s)
 const $$ = s => Array.from(document.querySelectorAll(s))
 
 const DEFAULTS = {
-    theme: 'light', fontSize: 18, lineHeight: 1.5, margin: 24, fontFamily: 'publisher',
+    theme: 'light', fontSize: 18, lineHeight: 1.5, margin: 24, fontFamily: 'publisher', companion: true,
     flow: 'paginated', justify: true, hyphenate: true, pdfZoom: 1, keepScreenOn: false, defineOnSelect: true,
     selectMode: false, translateTo: null,
 }
@@ -173,6 +174,8 @@ class Reader {
         this.#startSession()
         phase('ready')
         if (this.kind !== 'pdf') Listener.preload().catch(() => {})
+        this.companion = new Companion($('#companion'), { enabled: this.settings.companion !== false, reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches })
+        setTimeout(() => this.companion.greet(this.lastFraction ?? 0), 600)
         $('#loading').hidden = true
         bridge.onReady()
         bridge.keepScreenOn(this.settings.keepScreenOn)
@@ -244,7 +247,7 @@ class Reader {
         if (!r) return
         if (this.kind === 'reflow') {
             r.setAttribute('flow', s.flow)
-            r.setAttribute('margin', `${s.margin}px`)
+            r.setAttribute('margin', `${s.companion !== false ? Math.max(s.margin, 52) : s.margin}px`)
             r.setAttribute('gap', '6%')
             r.setAttribute('max-inline-size', '760px')
             r.setAttribute('max-column-count', '2')
@@ -354,6 +357,7 @@ class Reader {
         this.#highlightToc(tocItem?.href)
         this.#saveProgress({ location: cfi, fraction, label })
         this.#tickPages(fraction)
+        this.companion?.react('page', { fraction, chapter: label })
         if (fraction >= 0.985 && location && location.current >= location.total - 1) this.#celebrate()
     }
 
@@ -554,6 +558,7 @@ class Reader {
         this.dictWord = word
         this.dictPhrase = phrase.replace(/\s+/g, ' ').trim()
         this.dictOpen = true
+        this.companion?.react('lookup'); this.companion?.tuck(true)
         this.#dictTab('meaning')
         $('#tr-body').innerHTML = ''
         const card = $('#dict-card')
@@ -625,6 +630,7 @@ class Reader {
             const w = { word: r.word.toLowerCase(), phonetic: r.phonetic || '', pos: m?.pos || '', def: m?.defs?.[0]?.def || '', context: this.#contextSentence(), bookId: this.info?.id, bookTitle: $('#title').textContent }
             this.savedWord = await hostStore.saveWord(w)
             this.toast('saved to your words')
+            this.companion?.react('word')
             btn.classList.remove('popped'); void btn.offsetWidth; btn.classList.add('popped')
         }
         btn.textContent = this.savedWord ? 'saved ✓' : 'save word'
@@ -647,6 +653,7 @@ class Reader {
     }
 
     closeDictionary() {
+        this.companion?.tuck(this.barsVisible || !$('#settings-panel').classList.contains('hidden'))
         if (!this.dictOpen) return
         this.dictOpen = false
         this.dictWord = null
@@ -717,6 +724,7 @@ class Reader {
         this.#drawSaved(h)
         this.#renderHighlightList()
         this.toast(note ? 'note saved' : 'highlighted')
+        this.companion?.react('highlight')
         return h
     }
     #drawSaved(h) {
@@ -831,6 +839,7 @@ class Reader {
                 $('#listen-bar').hidden = st === 'idle'
                 $('#listen-bar').classList.toggle('playing', st === 'playing')
                 $('#btn-listen').classList.toggle('on', st !== 'idle')
+                this.companion?.react('listen', { on: st === 'playing' })
                 if (st === 'idle') this.#ttsHighlight(null)
             })
             this.listener.addEventListener('done', () => this.toast('end of book'))
@@ -897,6 +906,7 @@ class Reader {
         this.sessionTimer = setInterval(() => {
             if (document.hidden) return
             this.session.seconds += 15
+            this.companion?.react('tick', { seconds: this.session.seconds })
             if (this.session.seconds % 60 === 0) this.#flushSession()
         }, 15000)
     }
@@ -956,17 +966,20 @@ class Reader {
     // ---------- chrome ----------
     showBars(v) {
         this.barsVisible = v
+        this.companion?.tuck(v || this.dictOpen)
         $('#top-bar').classList.toggle('hidden', !v)
         $('#bottom-bar').classList.toggle('hidden', !v)
         bridge.setBarsVisible(v)
     }
     openPanel(id) {
         this.closePanels()
+        this.companion?.tuck(true)
         $('#' + id).classList.remove('hidden')
         $('#scrim').classList.remove('hidden')
         if (id === 'search-panel') setTimeout(() => $('#search-input').focus(), 250)
     }
     closePanels() {
+        this.companion?.tuck(this.barsVisible || this.dictOpen)
         let closed = false
         for (const p of $$('.panel:not(.dict)')) if (!p.classList.contains('hidden')) { p.classList.add('hidden'); closed = true }
         $('#scrim').classList.add('hidden')
@@ -1007,6 +1020,7 @@ class Reader {
         $('#sel-font').addEventListener('change', e => this.#update({ fontFamily: e.target.value }))
         $('#chk-justify').addEventListener('change', e => this.#update({ justify: e.target.checked }))
         $('#chk-wake').addEventListener('change', e => this.#update({ keepScreenOn: e.target.checked }))
+        $('#chk-companion').addEventListener('change', e => { this.#update({ companion: e.target.checked }); this.companion?.setEnabled(e.target.checked) })
         $('#chk-define').addEventListener('change', e => this.#update({ defineOnSelect: e.target.checked }))
         $('#chk-select').addEventListener('change', e => this.#update({ selectMode: e.target.checked }))
         const langSel = $('#sel-lang')
@@ -1081,6 +1095,7 @@ class Reader {
         const s = this.settings
         $$('#theme-chips [data-theme]').forEach(c => c.classList.toggle('active', c.dataset.theme === s.theme))
         $$('[data-flow]').forEach(c => c.classList.toggle('active', c.dataset.flow === s.flow))
+        $('#chk-companion').checked = s.companion !== false
         $('#val-fontSize').textContent = s.fontSize
         $('#val-lineHeight').textContent = s.lineHeight.toFixed(1)
         $('#val-margin').textContent = s.margin

@@ -14,12 +14,15 @@
 
 <div id="tap-hint" hidden></div>
 
-<div id="loading"><div class="mark"><span></span></div><div id="loading-text">opening…</div></div>
+<div id="loading"><div class="lumi load-lumi" data-pose="thinking" data-blink style="--eyes:46.5% 43.4%;--spark:80.5% 16.2%;aspect-ratio:241/259"><img class="l-body" src="brand/lumi-thinking-body.png" alt="" width="241" height="259"><img class="l-eyes" src="brand/lumi-thinking-eyes.png" alt="" width="241" height="259"><img class="l-spark" src="brand/lumi-thinking-spark.png" alt="" width="241" height="259"></div><div id="loading-text">opening…</div></div>
 <div id="error" hidden>
+  <div class="lumi error-lumi" data-pose="lying" data-blink style="--eyes:30.9% 56.9%;--spark:64.1% 13.7%;aspect-ratio:298/204"><img class="l-body" src="brand/lumi-lying-body.png" alt="" width="298" height="204"><img class="l-eyes" src="brand/lumi-lying-eyes.png" alt="" width="298" height="204"><img class="l-spark" src="brand/lumi-lying-spark.png" alt="" width="298" height="204"></div>
   <h2>Can’t open this book</h2>
   <p id="error-text"></p>
   <button id="error-back" class="btn">back to the shelf</button>
 </div>
+
+<div id="companion" class="companion" hidden><div class="comp-bubble" hidden></div><div class="lumi comp-lumi" data-pose="reading" data-blink style="--eyes:43.8% 45.1%;--spark:88.2% 13.3%;aspect-ratio:406/396"><img class="l-body" src="brand/lumi-reading-body.png" alt="" width="406" height="396"><img class="l-eyes" src="brand/lumi-reading-eyes.png" alt="" width="406" height="396"><img class="l-spark" src="brand/lumi-reading-spark.png" alt="" width="406" height="396"></div></div>
 
 <header id="top-bar" class="bar hidden">
   <button id="btn-back" class="icon" aria-label="Back to shelf">
@@ -119,6 +122,10 @@
     <div class="row pdf-only">
       <span class="label">Zoom</span>
       <div class="stepper"><button data-step="pdfZoom" data-delta="-0.25">−</button><span id="val-pdfZoom"></span><button data-step="pdfZoom" data-delta="0.25">+</button></div>
+    </div>
+    <div class="row">
+      <span class="label">Lumi reads with you <small class="sub">a small companion in the corner</small></span>
+      <label class="switch"><input type="checkbox" id="chk-companion"><span></span></label>
     </div>
     <div class="row">
       <span class="label">Hold a word for its meaning</span>

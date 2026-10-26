@@ -258,12 +258,32 @@ body[data-theme="gray"] .dict-title h2, body[data-theme="dark"] .dict-title h2 {
 .voice-hint { margin: 12px 22px 4px; font-size: 13px; line-height: 1.45; color: var(--muted); font-weight: 600; }
 .voice-hint b { color: var(--ink); }
 
-/* Lumi on the finish screen (layered artwork) */
-.lumi { position: relative; display: block; } .lumi img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
-.finish-mascot { width: 128px; margin: -4px auto 4px; animation: hop 0.7s cubic-bezier(.34,1.56,.64,1); }
-body[data-theme="light"] .finish-mascot, body[data-theme="sepia"] .finish-mascot { filter: drop-shadow(0 3px 3px rgba(30,22,54,0.16)); }
-.finish-mascot .l-body { transform-origin: 50% 100%; animation: breathe 3.8s ease-in-out infinite; }
-.finish-mascot .l-spark { transform-origin: var(--spark); animation: pulse 0.8s ease-in-out infinite; }
+/* Lumi: the original artwork split into body / eyes / sparkle layers */
+.lumi { position: relative; display: block; user-select: none; } .lumi img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
+body[data-theme="light"] .lumi, body[data-theme="sepia"] .lumi { filter: drop-shadow(0 3px 3px rgba(30,22,54,0.16)); }
+.lumi .l-body { transform-origin: 50% 100%; animation: breathe 3.8s ease-in-out infinite; }
+.lumi .l-eyes { transform-origin: var(--eyes); } .lumi[data-blink] .l-eyes { animation: blink 5.5s infinite; }
+.lumi .l-spark { transform-origin: var(--spark); animation: twinkle 4.2s ease-in-out infinite; }
+.lumi[data-pose="happy"] .l-spark { animation: pulse 0.8s ease-in-out infinite; }
+.lumi[data-pose="thinking"] .l-spark { animation: float 3s ease-in-out infinite; }
+.lumi[data-pose="blanket"] .l-body { animation: snooze 4.4s ease-in-out infinite; }
+.lumi[data-pose="lying"] .l-body { animation: breathe 5s ease-in-out infinite; }
+.lumi.is-happy { animation: hop 0.7s cubic-bezier(.34,1.56,.64,1); }
 @keyframes breathe { 0%, 100% { transform: scale(1, 1) } 50% { transform: scale(1.012, 0.984) } }
+@keyframes blink { 0%, 95%, 100% { transform: scaleY(1) } 97.5% { transform: scaleY(0.08) } }
+@keyframes twinkle { 0%, 72%, 100% { transform: scale(1) rotate(0) } 82% { transform: scale(0.55) rotate(40deg) } 92% { transform: scale(1.12) rotate(90deg) } }
 @keyframes pulse { 0%, 100% { transform: scale(0.92); opacity: 0.7 } 50% { transform: scale(1.08); opacity: 1 } }
-@keyframes hop { 0%, 100% { transform: translateY(0) } 40% { transform: translateY(-10px) } }
+@keyframes float { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-4px) } }
+@keyframes snooze { 0%, 100% { transform: scale(1, 1) } 50% { transform: scale(1.02, 0.97) } }
+@keyframes hop { 0%, 100% { transform: translateY(0) } 40% { transform: translateY(-8px) } }
+.load-lumi { width: 150px; } .error-lumi { width: 160px; margin: 0 auto 10px; }
+.finish-mascot { width: 128px; margin: -4px auto 4px; animation: hop 0.7s cubic-bezier(.34,1.56,.64,1); }
+.finish-mascot .l-spark { animation: pulse 0.8s ease-in-out infinite; }
+/* the reading companion in the corner */
+.companion { position: absolute; right: 8px; bottom: calc(var(--sab) + 2px); z-index: 25; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; transition: transform 0.35s cubic-bezier(.34,1.3,.64,1), opacity 0.25s; }
+.companion.tucked { transform: translateY(130%); opacity: 0; pointer-events: none; }
+.comp-lumi { width: 54px; cursor: pointer; }
+.comp-bubble { max-width: min(230px, 70vw); background: var(--card); color: var(--ink); border: 2px solid var(--line); border-radius: 16px 16px 4px 16px; padding: 8px 12px; font-family: var(--ui); font-size: 13px; font-weight: 600; line-height: 1.35; box-shadow: var(--shadow); margin-right: 6px; }
+.comp-bubble.pop { animation: pop 0.3s cubic-bezier(.34,1.56,.64,1); }
+.companion.listening .l-spark { animation: pulse 0.9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .lumi, .lumi *, .comp-bubble { animation: none !important; } }
