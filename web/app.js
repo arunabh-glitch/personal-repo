@@ -201,6 +201,9 @@ const mascotLife = () => {
     return { act: (name = 'excited', ms = 1200) => act(name, ms, true) }
 }
 const mascot = mascotLife()
+// size the page to the visible viewport (Android browsers can report dynamic viewport units taller than what is visible)
+const fitViewport = () => { const h = window.visualViewport?.height || window.innerHeight; if (h > 200) document.documentElement.style.setProperty('--vvh', Math.round(h) + 'px') }
+fitViewport(); window.visualViewport?.addEventListener('resize', fitViewport); window.addEventListener('resize', fitViewport)
 // no pinch zoom on the shelf (iOS ignores the viewport meta; the gesture events are what it honours)
 for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, e => e.preventDefault())
 
