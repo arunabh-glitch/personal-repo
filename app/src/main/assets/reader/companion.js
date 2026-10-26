@@ -27,7 +27,8 @@ const LINES = {
     long: { 45: '45 minutes in. stretch?', 60: 'an hour. water break?', 90: 'ninety minutes. legend. maybe blink?', 120: 'two hours. i’m impressed and a little worried.' },
     idle: ['still there?', 'i’ll wait.', 'no rush.'],
     tap: ['hi.', 'this part’s good.', 'still here.', 'reading with you.', 'don’t mind me.', 'same page as you.'],
-    tapSleepy: ['zzz… oh, hi.', 'five more minutes…', 'mm? still reading?'],
+    tapSleepy: ['zzz… oh, hi.', 'five more minutes…', 'mm? still reading?', '…was i snoring?'],
+    poke: ['hey!', 'that tickles.', 'okay, okay.', 'i’m up, i’m up.'],
     wake: ['oh. hi again.', 'back! where were we?'],
     listen: ['i’ll listen too.', 'read it to us.'],
 }
@@ -53,7 +54,16 @@ export class Companion {
         clearTimeout(this.poseTimer)
         if (ms) this.poseTimer = setTimeout(() => setPose(this.figure, this.baseline), ms)
     }
-    hop() { if (this.reduceMotion) return; this.figure.classList.remove('is-happy'); void this.figure.offsetWidth; this.figure.classList.add('is-happy'); setTimeout(() => this.figure.classList.remove('is-happy'), 800) }
+    hop() { this.#play('is-happy', 800) }
+    #play(cls, ms) { if (this.reduceMotion) return; this.figure.classList.remove(cls); void this.figure.offsetWidth; this.figure.classList.add(cls); setTimeout(() => this.figure.classList.remove(cls), ms) }
+    // asleep or lying down: stir under the blanket, sit up with a stretch, then back to the book
+    #wakeUp(after) {
+        if (this.waking) return
+        this.waking = true; this.asleep = false; clearTimeout(this.poseTimer)
+        this.#play('is-stir', 900)
+        setTimeout(() => { setPose(this.figure, 'lying'); this.#play('is-stretch', 900) }, this.reduceMotion ? 0 : 850)
+        setTimeout(() => { this.waking = false; setPose(this.figure, 'reading'); this.hop(); if (this.late) this.poseTimer = setTimeout(() => setPose(this.figure, 'blanket'), 12000); after?.() }, this.reduceMotion ? 0 : 1700)
+    }
     say(text, ms = 3600, { chat = false } = {}) {
         if (!this.enabled || !text) return false
         this.bubble.textContent = text
@@ -123,8 +133,14 @@ export class Companion {
         const now = Date.now()
         if (this.onTap && now - (this.lastTap || 0) < 3500) { this.openChat(); return }
         this.lastTap = now
-        if (this.asleep || this.late) { if (this.asleep) { this.asleep = false; this.pose(this.baseline) } this.say(pick(LINES.tapSleepy), 3500, { chat: true }); return }
-        this.pose('happy', 1800); this.hop(); this.say(pick(LINES.tap), 3500, { chat: true })
+        if (this.waking) return
+        const dozing = this.asleep || this.figure.dataset.pose === 'blanket' || this.figure.dataset.pose === 'lying'
+        if (dozing) { this.say(pick(LINES.tapSleepy), 4000, { chat: true }); this.#wakeUp(); return }
+        // rapid taps get a startled wobble and a complaint; a single tap a happy hop
+        this.taps = (now - (this.lastTapAt || 0) < 1500 ? (this.taps || 0) : 0) + 1; this.lastTapAt = now
+        this.#play('is-poked', 500)
+        setTimeout(() => { this.pose('happy', 1800); this.hop() }, this.reduceMotion ? 0 : 250)
+        this.say(pick(this.taps >= 3 ? LINES.poke : LINES.tap), 3500, { chat: true })
     }
     openChat() { if (!this.onTap) return; this.lastTap = 0; this.asleep = false; this.hush(); this.pose('happy', 1800); this.hop(); this.onTap() }
     destroy() { clearInterval(this.timer) }
