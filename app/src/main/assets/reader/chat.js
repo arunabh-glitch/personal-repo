@@ -16,8 +16,9 @@ export const PROVIDERS = {
         ],
     },
     gemini: {
-        name: 'Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/models', link: 'https://aistudio.google.com/apikey', placeholder: 'AIza…',
-        keyOk: k => /^AIza[0-9A-Za-z_-]{20,}$/.test(k), keyStore: 'lumi.chat.key.gemini', modelStore: 'lumi.chat.model.gemini',
+        name: 'Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/models', link: 'https://aistudio.google.com/apikey', placeholder: 'AQ.… or AIza…',
+        // AI Studio keys come as AIza… (classic) or AQ.… (newer); accept anything key-shaped that isn't another provider's
+        keyOk: k => /^\S{20,}$/.test(k) && !/^sk-/.test(k), keyStore: 'lumi.chat.key.gemini', modelStore: 'lumi.chat.model.gemini',
         models: [
             { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', note: 'balanced, free tier' },
             { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash-Lite', note: 'fastest, free tier' },
