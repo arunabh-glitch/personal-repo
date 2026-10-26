@@ -20,6 +20,15 @@ export const PROVIDERS = {
             { id: 'claude-haiku-5-5', name: 'Haiku 5.5', note: 'fastest, cheapest' },
         ],
     },
+    gemini: {
+        name: 'Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/models', link: 'https://aistudio.google.com/apikey', placeholder: 'AIza…',
+        keyOk: k => /^AIza[0-9A-Za-z_-]{20,}$/.test(k), keyStore: 'lumi.chat.key.gemini', modelStore: 'lumi.chat.model.gemini',
+        models: [
+            { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', note: 'balanced, free tier' },
+            { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash-Lite', note: 'fastest, free tier' },
+            { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', note: 'sharpest, may need billing' },
+        ],
+    },
     openai: {
         name: 'OpenAI', url: 'https://api.openai.com/v1/chat/completions', link: 'https://platform.openai.com/api-keys', placeholder: 'sk-…',
         keyOk: k => /^sk-/.test(k) && !/^sk-ant-/.test(k), keyStore: 'lumi.chat.key.openai', modelStore: 'lumi.chat.model.openai',
@@ -69,7 +78,7 @@ export const persona = ({ title, author, fraction = 0, chapter = '', excerpt = '
 }
 
 /** Streams one reply. Yields { text } deltas and finally { stop } with a stop reason ('end_turn' | 'refusal' | …). */
-export function stream(opts) { return (opts.provider === 'openai' ? streamOpenAI : opts.provider === 'lumi' ? streamRelay : streamClaude)(opts) }
+export function stream(opts) { return ({ openai: streamOpenAI, gemini: streamGemini, lumi: streamRelay }[opts.provider] || streamClaude)(opts) }
 
 const readSSE = async function* (res) {
     const reader = res.body.getReader(), dec = new TextDecoder()
@@ -125,6 +134,28 @@ export async function* streamClaude({ key, model, system, messages, signal, fetc
     yield* claudeEvents(res)
 }
 
+// Gemini: the persona is the systemInstruction, turns are user/model contents, text arrives per candidate part.
+export async function* streamGemini({ key, model, system, messages, signal, fetchFn = fetch }) {
+    const url = `${PROVIDERS.gemini.url}/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
+    const headers = { 'content-type': 'application/json', 'x-goog-api-key': key }
+    const body = {
+        systemInstruction: { parts: [{ text: system }] },
+        contents: messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+        generationConfig: { maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'low' } },
+    }
+    const res = await fetchFn(url, { method: 'POST', headers, body: JSON.stringify(body), signal })
+    if (!res.ok) await fail(res)
+    let stop = null
+    for await (const ev of readSSE(res)) {
+        if (ev.error) throw new ChatError(ev.error.code || 0, ev.error.message)
+        if (ev.promptFeedback?.blockReason) { stop = 'refusal'; continue }
+        const c = ev.candidates?.[0]
+        for (const part of c?.content?.parts || []) if (part.text && !part.thought) yield { text: part.text }
+        if (c?.finishReason && c.finishReason !== 'FINISH_REASON_UNSPECIFIED') stop = c.finishReason === 'STOP' ? 'end_turn' : c.finishReason === 'MAX_TOKENS' ? 'max_tokens' : 'refusal'
+    }
+    yield { stop: stop || 'end_turn' }
+}
+
 // OpenAI Chat Completions: the persona goes in as a system message; deltas arrive as choices[0].delta.content.
 export async function* streamOpenAI({ key, model, system, messages, signal, fetchFn = fetch }) {
     const headers = { 'content-type': 'application/json', authorization: `Bearer ${key}` }
@@ -155,7 +186,8 @@ const friendly = e => {
     }
     if (e.status === 401) return 'that key didn’t work. check it in settings?'
     if (e.status === 403) return 'that key isn’t allowed to do this.'
-    if (e.status === 429) return /quota|billing|credit/i.test(e.message) ? 'that key is out of credits.' : 'too many questions at once, give it a moment.'
+    if (e.status === 429) return chatConfig.provider === 'gemini' ? 'gemini’s free quota is used up for now. try again in a minute, or tomorrow.' : /quota|billing|credit/i.test(e.message) ? 'that key is out of credits.' : 'too many questions at once, give it a moment.'
+    if (e.status === 400 && /API key|api_key/i.test(e.message)) return 'that key didn’t work. check it in settings?'
     if (e.status === 529 || e.status === 503) return 'claude is busy right now, try again in a bit.'
     if (e.status === 0 || e instanceof TypeError) return `can’t reach ${chatConfig.spec.name.toLowerCase()}. are you online?`
     return e.message ? `hmm: ${e.message}` : 'something went wrong.'
@@ -229,7 +261,7 @@ export class LumiChat {
     #saveSetup() {
         const k = this.q('#chat-key').value.trim()
         if (!k) { this.toast?.('paste a key first'); return }
-        if (!chatConfig.spec.keyOk(k)) { this.toast?.(`that doesn’t look like a${chatConfig.provider === 'openai' ? 'n openai' : ' claude'} api key`); return }
+        if (!chatConfig.spec.keyOk(k)) { this.toast?.(`that doesn’t look like a${chatConfig.provider === 'openai' ? 'n openai' : ' ' + chatConfig.spec.name.toLowerCase()} api key`); return }
         chatConfig.key = k; this.#syncProvider(); this.showSetup(false); this.render(); this.toast?.('key saved on this device')
         setTimeout(() => this.input.focus({ preventScroll: true }), 100)
     }
@@ -298,7 +330,7 @@ export class LumiChat {
                 reply.closest('.msg').classList.add('error'); reply.classList.remove('typing')
                 reply.innerHTML = ''; const p = document.createElement('p'); p.textContent = msg; reply.append(p)
                 const r = document.createElement('button'); r.type = 'button'; r.className = 'mini'; r.dataset.retry = text; r.textContent = 'try again'; reply.append(r)
-                if (e.status === 401) this.showSetup(true)
+                if (e.status === 401 || (e.status === 400 && /key/i.test(e.message))) this.showSetup(true)
             }
             setPose(this.figure, 'reading')
         } finally {
