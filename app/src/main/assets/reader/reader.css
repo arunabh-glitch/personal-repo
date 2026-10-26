@@ -16,7 +16,8 @@ body[data-theme="dark"]  { --paper: #000000; --ink: #f1ece4; --muted: #9d9589; -
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html { height: 100%; }
 html, body { margin: 0; overflow: hidden; overflow: clip; background: var(--paper); color: var(--ink); font-family: var(--ui); overscroll-behavior: none; -webkit-touch-callout: none; }
-body { position: relative; height: 100%; height: 100dvh; }
+/* --vvh is kept equal to the visual viewport by reader.js: on Android the dynamic viewport units can exceed the visible area, pushing the bottom bar off screen */
+body { position: relative; height: 100%; height: 100dvh; height: var(--vvh, 100dvh); }
 button { font: inherit; color: inherit; cursor: pointer; }
 h2 { font-family: var(--display); font-weight: 800; font-size: 24px; letter-spacing: -0.02em; margin: 0; font-variation-settings: 'opsz' 40, 'wdth' 90; }
 

@@ -14,7 +14,7 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--ui); min-height: 100%; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-body { padding-top: var(--sat); overscroll-behavior-y: none; position: relative; overflow-x: hidden; }
+body { overscroll-behavior-y: none; position: relative; overflow-x: hidden; }
 button { font: inherit; color: inherit; cursor: pointer; }
 h1, h2 { font-family: var(--display); margin: 0; letter-spacing: -0.02em; font-variation-settings: 'opsz' 96, 'wdth' 88; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -28,7 +28,8 @@ h1, h2 { font-family: var(--display); margin: 0; letter-spacing: -0.02em; font-v
 .b3 { width: 85vw; height: 85vw; left: 5vw; bottom: -35vh; --c: var(--lime); opacity: 0.3; }
 @media (prefers-color-scheme: dark) { .blobs i { opacity: 0.16; } .b3 { --c: var(--blue); opacity: 0.14; } }
 
-.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 18px 6px; max-width: 1100px; margin: 0 auto; }
+.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: calc(14px + var(--sat)) 18px 8px; max-width: 1100px; margin: 0 auto; position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 84%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+@supports not (background: color-mix(in srgb, red 50%, blue)) { .top { background: var(--bg); } }
 .brand { display: flex; align-items: center; gap: 12px; min-height: 52px; }
 .mascot { width: 52px; height: 52px; flex: none; overflow: visible; animation: peek 5s ease-in-out infinite; transform-origin: 50% 90%; }
 @keyframes peek { 0%, 86%, 100% { transform: rotate(0) } 90% { transform: rotate(-6deg) } 95% { transform: rotate(4deg) } }

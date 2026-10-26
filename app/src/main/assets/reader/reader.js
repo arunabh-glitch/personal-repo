@@ -1028,6 +1028,12 @@ class Reader {
         $$('.ls-rates button').forEach(b => b.addEventListener('click', () => { this.listener?.setRate(+b.dataset.rate); $$('.ls-rates button').forEach(x => x.classList.toggle('active', x === b)); $('#voice-rate').value = b.dataset.rate; $('#voice-rate-val').textContent = (+b.dataset.rate).toFixed(2).replace(/0$/, '') + '×' }))
         $('#finish-shelf').addEventListener('click', () => bridge.close())
         $('#finish-stay').addEventListener('click', () => { $('#finish').hidden = true })
+        // keep the page exactly as tall as the visible viewport (browser toolbars, keyboard, Android nav bars)
+        const fitViewport = () => { const h = window.visualViewport?.height || window.innerHeight; if (h > 200) document.documentElement.style.setProperty('--vvh', Math.round(h) + 'px') }
+        fitViewport()
+        window.visualViewport?.addEventListener('resize', fitViewport)
+        window.addEventListener('resize', fitViewport)
+        window.addEventListener('orientationchange', () => setTimeout(fitViewport, 300))
         // the body must never scroll: hidden sheets hang below it and a focus-scroll would shift the whole UI
         const unscroll = () => { if (document.body.scrollTop || document.body.scrollLeft) { document.body.scrollTop = 0; document.body.scrollLeft = 0 } }
         document.body.addEventListener('scroll', unscroll); window.addEventListener('focusin', () => setTimeout(unscroll, 50))
