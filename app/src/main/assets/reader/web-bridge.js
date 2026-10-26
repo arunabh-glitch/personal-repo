@@ -1,6 +1,6 @@
 // Host bridge for the web build (iPhone home-screen app / any browser).
 // Mirrors the Android `window.Android` interface on top of IndexedDB.
-import { library, dataUrlToRecord } from './store.js'
+import { library, highlights, sessions, dataUrlToRecord } from './store.js'
 
 const SETTINGS_KEY = 'openshelf.reader.settings'
 
@@ -50,5 +50,12 @@ export const createWebBridge = async id => {
             } catch (e) { console.warn('wake lock', e) }
         },
         openExternal: href => window.open(href, '_blank', 'noopener'),
+        // highlights & notes
+        listHighlights: async () => JSON.stringify(await highlights.list(id)),
+        saveHighlight: async json => { const h = JSON.parse(json); h.bookId = id; return (await highlights.put(h)).id },
+        deleteHighlight: hid => highlights.remove(hid),
+        // reading sessions
+        saveSession: json => { const s = JSON.parse(json); s.bookId = id; return sessions.put(s) },
+        markFinished: () => library.update(id, { finishedAt: Date.now() }).catch(console.error),
     }
 }

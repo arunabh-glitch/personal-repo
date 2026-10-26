@@ -6,6 +6,12 @@ Runs as an Android app and as an installable web app for iPhone, iPad and deskto
 
 **Formats:** EPUB (2 and 3, including fixed layout), PDF, MOBI, AZW / AZW3 (KF8), FB2 / FB2.zip, CBZ comics, plain text, Markdown and HTML.
 
+**Shelf (web app)**
+- Stats card: minutes today and this week, day streak, milestone stickers; a "finished" shelf.
+- Tags (collections), search, and a "find free books" catalog (Project Gutenberg via Gutendex, Internet Archive) that downloads straight to the shelf.
+- Back up shelf / restore a backup: one zip with books, positions, highlights, stats and settings, for moving between devices (positions merge, furthest read wins).
+- Android: Dogear registers as a share target once installed from Chrome. iPhone: web apps can't join the Share sheet; the in-app tips describe a Save-to-Files shortcut.
+
 **Sources**
 - Import from any file manager or cloud drive via the system file picker (multi-select).
 - "Open with" / "Share to Dogear" from other apps (mail attachments, browsers, Telegram, Drive…).
@@ -14,6 +20,11 @@ Runs as an Android app and as an installable web app for iPhone, iPad and deskto
 - Download a book from a direct URL.
 
 **Reader**
+- Hold a word: meaning, translation (free MyMemory), pronunciation, and highlight colours; "whole sentence" grows the selection; "+ note" attaches a note. A "select text" mode adds a small toolbar for arbitrary passages.
+- Highlights & notes are listed next to the table of contents and redraw on every open (EPUB, text and PDF).
+- Listen: read-aloud with the device voices, sentence highlighted as it goes, speed control, continues across chapters.
+- Presets: cosy, focus, night owl.
+- Reading sessions are recorded automatically; finishing a book brings confetti.
 - Long-press (or double-tap) any word to see its meaning, pronunciation and examples without leaving the page. Looked-up words are cached, so they work offline afterwards. Works in EPUBs, PDFs and text files.
 - Pagination or continuous scroll, swipe or tap zones (left = back, right = forward, centre = menu).
 - Themes (light, sepia, dusk, dark), text size, line spacing, margins, font family, justification.

@@ -218,6 +218,7 @@ export class PdfViewer extends EventTarget {
             p.rendered = true
             p.scaleRendered = scale
             this.#renderTextLayer(p, page, scale).catch(e => console.warn('text layer', e))
+            this.dispatchEvent(new CustomEvent('page-rendered', { detail: { page: p.n, el: p.el } }))
         } catch (e) {
             if (e?.name !== 'RenderingCancelledException') console.error(e)
         } finally {

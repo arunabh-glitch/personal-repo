@@ -2,7 +2,7 @@
 // Two stores: `books` (metadata + cover blob) and `files` (the book file).
 
 const DB_NAME = 'openshelf'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 const FORMATS = {
     epub: 'application/epub+zip', pdf: 'application/pdf', mobi: 'application/x-mobipocket-ebook',
@@ -35,6 +35,8 @@ const open = () => dbPromise ??= new Promise((resolve, reject) => {
         const db = req.result
         if (!db.objectStoreNames.contains('books')) db.createObjectStore('books', { keyPath: 'id' })
         if (!db.objectStoreNames.contains('files')) db.createObjectStore('files')
+        if (!db.objectStoreNames.contains('highlights')) db.createObjectStore('highlights', { keyPath: 'id' }).createIndex('bookId', 'bookId')
+        if (!db.objectStoreNames.contains('sessions')) db.createObjectStore('sessions', { keyPath: 'id' }).createIndex('bookId', 'bookId')
     }
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
@@ -54,8 +56,44 @@ const tx = async (stores, mode, fn) => {
 }
 const req = r => new Promise((resolve, reject) => { r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error) })
 
-const uuid = () => crypto.randomUUID?.() ?? ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
+export const uuid = () => crypto.randomUUID?.() ?? ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
     (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16))
+
+export const highlights = {
+    async list(bookId) { return tx('highlights', 'readonly', t => req(t.objectStore('highlights').index('bookId').getAll(bookId))) },
+    async all() { return tx('highlights', 'readonly', t => req(t.objectStore('highlights').getAll())) },
+    async put(h) { if (!h.id) h.id = uuid(); if (!h.createdAt) h.createdAt = Date.now(); await tx('highlights', 'readwrite', t => req(t.objectStore('highlights').put(h))); return h },
+    async remove(id) { return tx('highlights', 'readwrite', t => req(t.objectStore('highlights').delete(id))) },
+}
+
+export const sessions = {
+    async all() { return tx('sessions', 'readonly', t => req(t.objectStore('sessions').getAll())) },
+    async forBook(bookId) { return tx('sessions', 'readonly', t => req(t.objectStore('sessions').index('bookId').getAll(bookId))) },
+    async put(sess) { if (!sess.id) sess.id = uuid(); await tx('sessions', 'readwrite', t => req(t.objectStore('sessions').put(sess))); return sess },
+}
+
+/** Reading statistics derived from sessions. Days are local-time calendar days. */
+export const computeStats = (list, now = Date.now()) => {
+    const dayKey = ts => { const d = new Date(ts); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` }
+    const byDay = new Map()
+    let total = 0
+    for (const s of list) {
+        const secs = Math.max(0, Math.min(s.seconds || 0, 6 * 3600))
+        total += secs
+        const k = dayKey(s.startedAt || s.endedAt || now)
+        byDay.set(k, (byDay.get(k) || 0) + secs)
+    }
+    const today = byDay.get(dayKey(now)) || 0
+    let week = 0
+    for (let i = 0; i < 7; i++) week += byDay.get(dayKey(now - i * 86400000)) || 0
+    // streak: consecutive days (ending today or yesterday) with at least 2 minutes
+    let streak = 0
+    const qualifies = ts => (byDay.get(dayKey(ts)) || 0) >= 120
+    let cursor = qualifies(now) ? now : qualifies(now - 86400000) ? now - 86400000 : null
+    while (cursor != null && qualifies(cursor)) { streak++; cursor -= 86400000 }
+    const pagesToday = list.filter(s => dayKey(s.startedAt || now) === dayKey(now)).reduce((a, s) => a + (s.pages || 0), 0)
+    return { todaySeconds: today, weekSeconds: week, totalSeconds: total, streak, pagesToday, sessions: list.length }
+}
 
 export const library = {
     async all() { return tx('books', 'readonly', t => req(t.objectStore('books').getAll())) },
@@ -66,8 +104,16 @@ export const library = {
         return toBlob(v)
     },
     async remove(id) {
-        return tx(['books', 'files'], 'readwrite', t => { t.objectStore('books').delete(id); t.objectStore('files').delete(id) })
+        return tx(['books', 'files', 'highlights', 'sessions'], 'readwrite', async t => {
+            t.objectStore('books').delete(id); t.objectStore('files').delete(id)
+            for (const store of ['highlights', 'sessions']) {
+                const keys = await req(t.objectStore(store).index('bookId').getAllKeys(id))
+                for (const k of keys) t.objectStore(store).delete(k)
+            }
+        })
     },
+    async putFileRecord(id, record) { return tx('files', 'readwrite', t => req(t.objectStore('files').put(record, id))) },
+    async getFileRecord(id) { return tx('files', 'readonly', t => req(t.objectStore('files').get(id))) },
     async update(id, patch) {
         return tx('books', 'readwrite', async t => {
             const store = t.objectStore('books')

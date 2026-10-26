@@ -25,5 +25,41 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "share_target": {
+    "action": "./share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "books",
+          "accept": [
+            "application/epub+zip",
+            "application/pdf",
+            "application/x-mobipocket-ebook",
+            "application/vnd.amazon.ebook",
+            "application/x-fictionbook+xml",
+            "application/vnd.comicbook+zip",
+            "text/plain",
+            "text/markdown",
+            "text/html",
+            ".epub",
+            ".pdf",
+            ".mobi",
+            ".azw",
+            ".azw3",
+            ".fb2",
+            ".cbz",
+            ".txt",
+            ".md",
+            ".html"
+          ]
+        }
+      ]
+    }
+  }
 }

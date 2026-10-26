@@ -26,8 +26,38 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
     e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()))
 })
+// Web Share Target (Android): files shared to Dogear are stored straight into the shelf.
+const FORMATS = { epub: 'application/epub+zip', pdf: 'application/pdf', mobi: 'application/x-mobipocket-ebook', azw: 'application/x-mobipocket-ebook', azw3: 'application/vnd.amazon.mobi8-ebook', kf8: 'application/vnd.amazon.mobi8-ebook', prc: 'application/x-mobipocket-ebook', fb2: 'application/x-fictionbook+xml', fbz: 'application/x-zip-compressed-fb2', cbz: 'application/vnd.comicbook+zip', txt: 'text/plain', md: 'text/markdown', markdown: 'text/markdown', html: 'text/html', htm: 'text/html', xhtml: 'application/xhtml+xml' }
+const openDB = () => new Promise((resolve, reject) => {
+    const r = indexedDB.open('dogear-db-probe-unused', 1); r.onsuccess = () => { r.result.close(); indexedDB.deleteDatabase('dogear-db-probe-unused'); resolve() }; r.onerror = () => resolve()
+})
+const storeShared = async files => {
+    await openDB()
+    const db = await new Promise((resolve, reject) => { const r = indexedDB.open('openshelf', 2); r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains('books')) d.createObjectStore('books', { keyPath: 'id' }); if (!d.objectStoreNames.contains('files')) d.createObjectStore('files'); if (!d.objectStoreNames.contains('highlights')) d.createObjectStore('highlights', { keyPath: 'id' }).createIndex('bookId', 'bookId'); if (!d.objectStoreNames.contains('sessions')) d.createObjectStore('sessions', { keyPath: 'id' }).createIndex('bookId', 'bookId') }; r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error) })
+    let n = 0
+    for (const f of files) {
+        const lower = (f.name || '').toLowerCase(); const ext = lower.endsWith('.fb2.zip') ? 'fbz' : lower.split('.').pop()
+        if (!(ext in FORMATS)) continue
+        const id = crypto.randomUUID()
+        const book = { id, title: f.name.replace(/\.[^.]+$/, '').replace(/_+/g, ' ').trim() || 'Untitled', author: '', format: ext, fileName: f.name, size: f.size, addedAt: Date.now(), lastOpenedAt: 0, progress: 0, location: null, progressLabel: null, cover: null, metadataFetched: false, sourceUrl: null, tags: [] }
+        const buf = await f.arrayBuffer()
+        await new Promise((resolve, reject) => { const t = db.transaction(['books', 'files'], 'readwrite'); t.objectStore('files').put({ type: f.type || FORMATS[ext], buf }, id); t.objectStore('books').put(book); t.oncomplete = resolve; t.onerror = () => reject(t.error) })
+        n++
+    }
+    db.close()
+    return n
+}
+
 self.addEventListener('fetch', e => {
     const url = new URL(e.request.url)
+    if (e.request.method === 'POST' && url.origin === location.origin && url.pathname.endsWith('/share')) {
+        e.respondWith((async () => {
+            let n = 0
+            try { const fd = await e.request.formData(); n = await storeShared(fd.getAll('books').filter(f => f && f.size)) } catch (err) { console.error('share target', err) }
+            return Response.redirect(new URL(`./index.html?shared=${n}`, self.registration.scope).href, 303)
+        })())
+        return
+    }
     if (e.request.method !== 'GET' || url.origin !== location.origin) return
     const key = keyFor(url)
     e.respondWith((async () => {

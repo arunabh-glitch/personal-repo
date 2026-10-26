@@ -3,6 +3,8 @@ import { makeTextBook, isTextFormat } from './text-book.js'
 import { createWebBridge } from './web-bridge.js'
 import { lookup, speak, selectedPhrase, normalizeWord } from './dictionary.js'
 import { Overlayer } from './foliate/overlayer.js'
+import { translate, LANGS, defaultTarget } from './translate.js'
+import { Listener } from './listen.js'
 
 const $ = s => document.querySelector(s)
 const $$ = s => Array.from(document.querySelectorAll(s))
@@ -10,7 +12,15 @@ const $$ = s => Array.from(document.querySelectorAll(s))
 const DEFAULTS = {
     theme: 'light', fontSize: 18, lineHeight: 1.5, margin: 24, fontFamily: 'publisher',
     flow: 'paginated', justify: true, hyphenate: true, pdfZoom: 1, keepScreenOn: false, defineOnSelect: true,
+    selectMode: false, translateTo: null,
 }
+const PRESETS = {
+    cosy: { theme: 'sepia', fontFamily: 'serif', fontSize: 19, lineHeight: 1.6, margin: 28, justify: true, flow: 'paginated' },
+    focus: { theme: 'light', fontFamily: 'sans-serif', fontSize: 18, lineHeight: 1.5, margin: 32, justify: false, flow: 'paginated' },
+    night: { theme: 'dark', fontFamily: 'serif', fontSize: 18, lineHeight: 1.55, margin: 24, justify: true, flow: 'paginated' },
+}
+const HL_COLORS = { lime: 'rgba(198,242,78,0.6)', pink: 'rgba(255,92,168,0.45)', blue: 'rgba(143,176,255,0.55)', sun: 'rgba(255,210,63,0.6)' }
+const uuid = () => crypto.randomUUID?.() ?? String(Date.now()) + Math.random().toString(16).slice(2)
 const THEMES = {
     light: { bg: '#f7f2e8', fg: '#1b1813', link: '#1a5fb4', dark: false, force: false },
     sepia: { bg: '#f1e6d0', fg: '#4a3a2a', link: '#8b4513', dark: false, force: true },
@@ -49,6 +59,30 @@ const bridge = {
     setBarsVisible(v) { native?.setBarsVisible?.(!!v) },
     keepScreenOn(v) { native?.keepScreenOn?.(!!v) },
     openExternal(url) { native ? native.openExternal(url) : window.open(url, '_blank') },
+}
+
+// Highlights and sessions live in the host's store (web: IndexedDB via the bridge; Android/test: localStorage).
+const hostStore = {
+    async list(bookId) {
+        if (native?.listHighlights) return JSON.parse(await native.listHighlights()) || []
+        try { return JSON.parse(localStorage.getItem('dogear.hl.' + bookId) || '[]') } catch { return [] }
+    },
+    async save(bookId, h) {
+        h.bookId = bookId; h.id ||= uuid(); h.createdAt ||= Date.now()
+        if (native?.saveHighlight) { await native.saveHighlight(JSON.stringify(h)); return h }
+        const list = (await this.list(bookId)).filter(x => x.id !== h.id); list.push(h)
+        localStorage.setItem('dogear.hl.' + bookId, JSON.stringify(list)); return h
+    },
+    async remove(bookId, id) {
+        if (native?.deleteHighlight) return native.deleteHighlight(id)
+        localStorage.setItem('dogear.hl.' + bookId, JSON.stringify((await this.list(bookId)).filter(x => x.id !== id)))
+    },
+    async saveSession(bookId, sess) {
+        sess.bookId = bookId
+        if (native?.saveSession) return native.saveSession(JSON.stringify(sess))
+        try { const all = JSON.parse(localStorage.getItem('dogear.sessions') || '[]').filter(x => x.id !== sess.id); all.push(sess); localStorage.setItem('dogear.sessions', JSON.stringify(all.slice(-500))) } catch { /* ignore */ }
+    },
+    markFinished() { try { native?.markFinished?.() } catch { /* ignore */ } },
 }
 
 const formatContributor = c => {
@@ -97,6 +131,7 @@ const blobToDataURL = async (blob, maxH = 600) => {
 class Reader {
     settings = null
     info = null
+    highlights = []
     kind = 'reflow' // reflow | fixed | pdf
     barsVisible = false
     tocHrefs = new Map()
@@ -110,9 +145,12 @@ class Reader {
         $('#title').textContent = this.info.title || ''
         this.#bindChrome()
         const fmt = (this.info.format || '').toLowerCase()
+        this.highlights = await hostStore.list(this.info.id).catch(() => [])
         phase('fetching file')
         if (fmt === 'pdf') await this.#openPdf()
         else await this.#openBook(fmt)
+        this.#renderHighlightList()
+        this.#startSession()
         phase('ready')
         $('#loading').hidden = true
         bridge.onReady()
@@ -147,8 +185,16 @@ class Reader {
         view.addEventListener('relocate', e => this.#onRelocate(e.detail))
         view.addEventListener('draw-annotation', e => {
             const { draw, annotation } = e.detail
-            if (String(annotation.value).startsWith('foliate-search:')) draw(Overlayer.highlight, { color: 'rgba(255,210,63,0.55)' })
+            const saved = this.hlByAnnotation?.get(annotation)
+            if (saved) draw(Overlayer.highlight, { color: HL_COLORS[saved.color] || HL_COLORS.lime })
+            else if (annotation === this.ttsAnnotation) draw(Overlayer.highlight, { color: 'rgba(91,124,255,0.35)' })
+            else if (String(annotation.value).startsWith('foliate-search:')) draw(Overlayer.highlight, { color: 'rgba(255,210,63,0.55)' })
             else draw(Overlayer.highlight, { color: 'rgba(198,242,78,0.75)' })
+        })
+        view.addEventListener('create-overlay', e => this.#drawSavedHighlights(e.detail.index))
+        view.addEventListener('show-annotation', e => {
+            const h = this.hlByValue?.get(e.detail.value)
+            if (h) this.openHighlightMenu(h)
         })
         view.addEventListener('external-link', e => { e.preventDefault(); bridge.openExternal(e.detail.href) })
         this.book.transformTarget?.addEventListener('data', ({ detail }) => {
@@ -157,6 +203,7 @@ class Reader {
 
         const title = formatTitle(this.book.metadata?.title) || this.info.title || this.info.fileName
         $('#title').textContent = title
+        this.lang = (Array.isArray(this.book.metadata?.language) ? this.book.metadata.language[0] : this.book.metadata?.language) || 'en'
         this.#applyRendererSettings()
         this.#buildToc(this.book.toc ?? [])
         phase('rendering first page')
@@ -196,7 +243,7 @@ class Reader {
             img, svg { ${t.dark ? 'filter: brightness(0.88);' : ''} }` : ''
         return `
             @namespace epub "http://www.idpf.org/2007/ops";
-            @media (pointer: coarse) { html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } }
+            ${s.selectMode ? '' : '@media (pointer: coarse) { html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } }'}
             html { color-scheme: ${t.dark ? 'dark' : 'light'}; }
             html, body { background: ${t.bg} !important; color: ${t.fg} !important; }
             html { font-size: ${s.fontSize}px !important; }
@@ -216,11 +263,12 @@ class Reader {
     #onSectionLoad({ doc }) {
         doc.addEventListener('click', e => this.#onDocClick(e, doc))
         doc.addEventListener('keydown', e => this.#onKey(e))
-        if (!COARSE) doc.addEventListener('selectionchange', () => this.#onSelectionChange(doc))
+        doc.addEventListener('selectionchange', () => this.#onSelectionChange(doc))
         this.#installLongPress(doc, (x, y) => {
             const range = wordRangeAt(doc, x, y)
             if (!range) return
             const index = this.view.renderer.getContents().find(c => c.doc === doc)?.index ?? 0
+            this.pending = { doc, range, index }
             this.#highlightRange({ cfi: this.view.getCFI(index, range) })
             this.define(range.toString())
         })
@@ -283,6 +331,8 @@ class Reader {
             location ? `${percent.format(fraction)} · ${location.current + 1}/${location.total}` : percent.format(fraction)
         this.#highlightToc(tocItem?.href)
         this.#saveProgress({ location: cfi, fraction, label })
+        this.#tickPages(fraction)
+        if (fraction >= 0.985 && location && location.current >= location.total - 1) this.#celebrate()
     }
 
     #saveProgress = debounce(p => bridge.saveProgress(p), 400)
@@ -308,6 +358,8 @@ class Reader {
             $('#status-right').textContent = `Page ${page} of ${total}`
             this.#highlightToc(`page:${this.#nearestOutlinePage(page)}`)
             this.#saveProgress({ location: `page:${page}`, fraction, label: `Page ${page} of ${total}` })
+            this.#tickPages(fraction)
+            if (page >= total && fraction >= 0.98) this.#celebrate()
         })
         this.pdf.addEventListener('zoom', e => { this.settings.pdfZoom = e.detail.zoom; this.#syncSettingsUI(); bridge.saveSettings(this.settings) })
         if (this.settings.pdfZoom && this.settings.pdfZoom !== 1) this.pdf.setZoom(this.settings.pdfZoom)
@@ -325,9 +377,12 @@ class Reader {
         this.#installLongPress($('#pdf'), (x, y) => {
             const range = wordRangeAt(document, x, y)
             if (!range) return
+            this.pending = { doc: document, range, page: +range.startContainer.parentElement?.closest('.page')?.dataset.page || this.pdf.current }
             this.#highlightRange({ range })
             this.define(range.toString())
         })
+        this.pdf.addEventListener('page-rendered', e => { this.#drawSavedPdfHighlights(e.detail.page, e.detail.el); if (this.lastTtsTarget?.page === e.detail.page) this.#ttsHighlight(this.lastTtsTarget) })
+        this.lang = 'en'
         $('#pdf').addEventListener('click', e => {
             if (Date.now() < (this.suppressTapUntil || 0)) return
             if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; return }
@@ -335,7 +390,7 @@ class Reader {
             tapTimer = setTimeout(() => { tapTimer = null; this.#handleTap(x) }, 280)
         })
         window.addEventListener('keydown', e => this.#onKey(e))
-        if (!COARSE) document.addEventListener('selectionchange', () => {
+        document.addEventListener('selectionchange', () => {
             const sel = document.getSelection()
             if (sel?.anchorNode && $('#pdf').contains(sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentNode)) this.#onSelectionChange(document)
         })
@@ -376,7 +431,7 @@ class Reader {
         let timer = null, start = null, fired = false
         const cancel = () => { clearTimeout(timer); timer = null }
         el.addEventListener('touchstart', e => {
-            if (!this.settings?.defineOnSelect || e.touches.length !== 1) return
+            if (!this.settings?.defineOnSelect || this.settings?.selectMode || e.touches.length !== 1) return
             const t = e.touches[0]; start = { x: t.clientX, y: t.clientY }; fired = false
             cancel()
             timer = setTimeout(() => { timer = null; fired = true; onPress(start.x, start.y) }, 420)
@@ -419,12 +474,24 @@ class Reader {
     // ---------- dictionary ----------
     #selectionTimer = null
     #onSelectionChange(doc) {
-        if (!this.settings.defineOnSelect) return
         clearTimeout(this.#selectionTimer)
         this.#selectionTimer = setTimeout(() => {
-            const phrase = selectedPhrase(doc.getSelection?.())
+            const sel = doc.getSelection?.()
+            if (!sel || sel.isCollapsed || !sel.toString().trim()) { $('#sel-bar').hidden = true; return }
+            const range = sel.getRangeAt(0)
+            if (this.settings.selectMode) {
+                const index = this.view?.renderer.getContents().find(c => c.doc === doc)?.index
+                const page = this.kind === 'pdf' ? +(range.startContainer.parentElement?.closest('.page')?.dataset.page || this.pdf.current) : undefined
+                this.pending = { doc, range: range.cloneRange(), index, page }
+                $('#sel-bar').hidden = false
+                return
+            }
+            if (!this.settings.defineOnSelect || COARSE) return
+            const phrase = selectedPhrase(sel)
             if (!phrase) return
             if (this.dictOpen && normalizeWord(phrase).toLowerCase() === (this.dictWord || '').toLowerCase()) return
+            const index = this.view?.renderer.getContents().find(c => c.doc === doc)?.index
+            this.pending = { doc, range: range.cloneRange(), index, page: this.kind === 'pdf' ? this.pdf.current : undefined }
             this.define(phrase)
         }, 450)
     }
@@ -433,7 +500,10 @@ class Reader {
         const word = normalizeWord(phrase)
         if (!word) return
         this.dictWord = word
+        this.dictPhrase = phrase.replace(/\s+/g, ' ').trim()
         this.dictOpen = true
+        this.#dictTab('meaning')
+        $('#tr-body').innerHTML = ''
         const card = $('#dict-card')
         card.classList.remove('hidden')
         $('#dict-word').textContent = word
@@ -481,8 +551,259 @@ class Reader {
         this.dictOpen = false
         this.dictWord = null
         $('#dict-card').classList.add('hidden')
+        $('#sel-bar').hidden = true
         this.#clearHighlight()
         try { this.view?.deselect?.(); document.getSelection()?.removeAllRanges() } catch { /* ignore */ }
+    }
+
+    // ---------- dictionary tabs / translate ----------
+    #dictTab(name) {
+        $$('[data-dtab]').forEach(t => t.classList.toggle('active', t.dataset.dtab === name))
+        $('#dict-body').hidden = name !== 'meaning'
+        $('#tr-body').hidden = name !== 'translate'
+        if (name === 'translate') this.#translateCurrent()
+    }
+    async #translateCurrent() {
+        const text = this.pending?.range?.toString()?.trim() || this.dictPhrase || this.dictWord
+        const target = this.settings.translateTo || defaultTarget()
+        const body = $('#tr-body')
+        const label = LANGS.find(([c]) => c === target)?.[1] || target
+        body.innerHTML = `<div class="dict-loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`
+        try {
+            const r = await translate(text, target, this.lang || 'en')
+            if ($('#tr-body').hidden) return
+            body.innerHTML = `<p class="tr-src">${escapeHTML(text)}</p><p class="tr-out">${escapeHTML(r.text)}</p><p class="dict-src">→ ${escapeHTML(label)} · ${escapeHTML(r.source)}</p>`
+        } catch (e) {
+            body.innerHTML = `<p class="dict-empty">${navigator.onLine ? 'Couldn’t translate right now.' : 'You’re offline. Translations need a connection.'}</p>`
+            console.warn(e)
+        }
+    }
+
+    // ---------- highlights & notes ----------
+    #expandPendingToSentence() {
+        const p = this.pending
+        if (!p?.range) return
+        const r = p.range
+        const node = r.startContainer, end = r.endContainer
+        if (node.nodeType !== 3) return
+        const text = node.data
+        let st = r.startOffset, en = end === node ? r.endOffset : text.length
+        while (st > 0 && !/[.!?]/.test(text[st - 1])) st--
+        while (st < text.length && /\s/.test(text[st])) st++
+        while (en < text.length && !/[.!?]/.test(text[en])) en++
+        if (en < text.length) en++
+        const range = p.doc.createRange(); range.setStart(node, st); range.setEnd(node, en)
+        p.range = range
+        if (p.index != null) this.#highlightRange({ cfi: this.view.getCFI(p.index, range) }); else this.#highlightRange({ range })
+        this.dictPhrase = range.toString().trim()
+        this.toast('whole sentence selected')
+    }
+    async saveHighlight(color, note = '') {
+        const p = this.pending
+        if (!p?.range) return
+        const text = p.range.toString().replace(/\s+/g, ' ').trim()
+        const h = { color, note, text }
+        if (this.kind === 'pdf') {
+            const pageEl = p.range.startContainer.parentElement?.closest('.page'); if (!pageEl) return
+            const pr = pageEl.getBoundingClientRect()
+            h.kind = 'pdf'; h.page = +pageEl.dataset.page
+            h.rects = Array.from(p.range.getClientRects()).map(r => ({ x: (r.left - pr.left) / pr.width, y: (r.top - pr.top) / pr.height, w: r.width / pr.width, h: r.height / pr.height }))
+        } else {
+            h.kind = 'epub'; h.cfi = this.view.getCFI(p.index ?? 0, p.range)
+        }
+        await hostStore.save(this.info.id, h)
+        this.highlights.push(h)
+        this.closeDictionary()
+        this.#drawSaved(h)
+        this.#renderHighlightList()
+        this.toast(note ? 'note saved ✍️' : 'highlighted 🖍')
+        return h
+    }
+    #drawSaved(h) {
+        if (h.kind === 'pdf') {
+            const el = $(`#pdf .page[data-page="${h.page}"]`)
+            if (el && el.querySelector('canvas')) this.#drawSavedPdfHighlights(h.page, el)
+            return
+        }
+        this.hlByAnnotation ??= new Map(); this.hlByValue ??= new Map()
+        const ann = { value: h.cfi }
+        this.hlByAnnotation.set(ann, h); this.hlByValue.set(h.cfi, h); h._ann = ann
+        this.view.addAnnotation(ann).catch?.(() => {})
+    }
+    #drawSavedHighlights(index) {
+        for (const h of this.highlights) {
+            if (h.kind !== 'epub') continue
+            try { if (this.view.resolveCFI(h.cfi).index !== index) continue } catch { continue }
+            if (!h._ann) this.#drawSaved(h); else this.view.addAnnotation(h._ann).catch?.(() => {})
+        }
+    }
+    #drawSavedPdfHighlights(page, el) {
+        el.querySelectorAll('.pdf-hl.saved').forEach(d => d.remove())
+        for (const h of this.highlights) {
+            if (h.kind !== 'pdf' || h.page !== page) continue
+            for (const r of h.rects || []) {
+                const d = document.createElement('div')
+                d.className = `pdf-hl saved ${h.color || 'lime'}`
+                d.style.cssText = `left:${r.x * 100}%;top:${r.y * 100}%;width:${r.w * 100}%;height:${r.h * 100}%`
+                d.addEventListener('click', e => { e.stopPropagation(); this.openHighlightMenu(h) })
+                el.append(d)
+            }
+        }
+    }
+    #removeDrawn(h) {
+        if (h.kind === 'pdf') { const el = $(`#pdf .page[data-page="${h.page}"]`); if (el) this.#drawSavedPdfHighlights(h.page, el); return }
+        if (h._ann) { try { this.view.deleteAnnotation(h._ann) } catch { /* ignore */ } this.hlByAnnotation?.delete(h._ann); this.hlByValue?.delete(h.cfi) }
+    }
+    openHighlightMenu(h) {
+        this.hlmTarget = h
+        this.hlmColor = h?.color || 'sun'
+        $('#hlm-text').textContent = h?.text || this.pending?.range?.toString().trim() || this.dictPhrase || ''
+        $('#hlm-note').value = h?.note || ''
+        $$('#hl-menu .dot').forEach(x => x.classList.toggle('active', x.dataset.hlm === this.hlmColor))
+        $('#hlm-delete').hidden = !h
+        if (!h) $('#dict-card').classList.add('hidden')
+        this.openPanel('hl-menu')
+        setTimeout(() => $('#hlm-note').focus(), 300)
+    }
+    async #saveHighlightMenu() {
+        const note = $('#hlm-note').value.trim()
+        const h = this.hlmTarget
+        if (h) {
+            const colorChanged = h.color !== this.hlmColor
+            h.note = note; h.color = this.hlmColor
+            await hostStore.save(this.info.id, h)
+            if (colorChanged) { this.#removeDrawn(h); delete h._ann; this.#drawSaved(h) }
+            this.#renderHighlightList(); this.closePanels(); this.toast('saved ✓')
+        } else {
+            this.closePanels()
+            await this.saveHighlight(this.hlmColor, note)
+        }
+    }
+    async #deleteHighlightMenu() {
+        const h = this.hlmTarget; if (!h) return
+        await hostStore.remove(this.info.id, h.id)
+        this.highlights = this.highlights.filter(x => x.id !== h.id)
+        this.#removeDrawn(h)
+        this.#renderHighlightList(); this.closePanels(); this.toast('deleted')
+    }
+    #renderHighlightList() {
+        const list = $('#hl-list'); list.textContent = ''
+        const items = [...(this.highlights || [])].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+        if (!items.length) { const d = document.createElement('div'); d.className = 'search-status'; d.textContent = 'hold a word, then tap a colour to highlight it.'; list.append(d); return }
+        for (const h of items) {
+            const b = document.createElement('button'); b.className = 'hl-item'; b.style.setProperty('--c', HL_COLORS[h.color] || HL_COLORS.lime)
+            b.innerHTML = `<span class="q">${escapeHTML(h.text)}</span>${h.note ? `<span class="n">${escapeHTML(h.note)}</span>` : ''}<span class="d">${h.kind === 'pdf' ? `page ${h.page}` : ''} ${new Date(h.createdAt || Date.now()).toLocaleDateString()}</span>`
+            b.addEventListener('click', () => { this.closePanels(); this.showBars(false); if (h.kind === 'pdf') this.pdf.goToPage(h.page); else this.view.goTo(h.cfi).catch(console.error) })
+            b.addEventListener('contextmenu', e => { e.preventDefault(); this.openHighlightMenu(h) })
+            list.append(b)
+        }
+    }
+    #selAction(action) {
+        const p = this.pending; if (!p?.range) return
+        const text = p.range.toString().trim()
+        if (action === 'copy') return this.#copy(text)
+        if (action === 'highlight') return this.saveHighlight('lime')
+        this.define(text.split(/\s+/).length > 4 ? text.split(/\s+/).slice(0, 4).join(' ') : text)
+        if (action === 'translate') { this.dictPhrase = text; this.#dictTab('translate') }
+    }
+    #copy(text) {
+        if (!text) return
+        navigator.clipboard?.writeText(text).then(() => this.toast('copied'), () => this.toast('couldn’t copy'))
+    }
+
+    // ---------- listen ----------
+    async toggleListen() {
+        if (this.listener && this.listener.state !== 'idle') { this.listener.toggle(); return }
+        this.listener ??= new Listener({
+            view: this.kind === 'pdf' ? null : this.view, pdf: this.kind === 'pdf' ? this.pdf : null, lang: this.lang || 'en',
+            onHighlight: target => this.#ttsHighlight(target),
+        })
+        if (!this.listener.supported) { this.toast('no voices on this device'); return }
+        this.listener.addEventListener('state', e => {
+            const st = e.detail
+            $('#listen-bar').hidden = st === 'idle'
+            $('#listen-bar').classList.toggle('playing', st === 'playing')
+            $('#btn-listen').classList.toggle('on', st !== 'idle')
+            if (st === 'idle') this.#ttsHighlight(null)
+        })
+        this.listener.addEventListener('done', () => this.toast('end of book 🎧'))
+        $$('.ls-rates button').forEach(x => x.classList.toggle('active', +x.dataset.rate === this.listener.rate))
+        this.showBars(false)
+        try { await this.listener.start() } catch (e) { this.toast(e.message) }
+    }
+    stopListen() { this.listener?.stop() }
+    #ttsHighlight(target) {
+        this.lastTtsTarget = target
+        if (this.kind === 'pdf') {
+            $$('.textLayer span.tts-on').forEach(s => s.classList.remove('tts-on'))
+            if (!target) return
+            const layer = $(`#pdf .page[data-page="${target.page}"] .textLayer`); if (!layer) return
+            const spans = layer.querySelectorAll('span')
+            target.spanIndices.forEach(i => spans[i]?.classList.add('tts-on'))
+            spans[target.spanIndices[0]]?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+            return
+        }
+        if (this.ttsAnnotation) { try { this.view.deleteAnnotation(this.ttsAnnotation) } catch { /* ignore */ } this.ttsAnnotation = null }
+        if (!target) return
+        const index = this.view.renderer.getContents()[0]?.index ?? 0
+        this.ttsAnnotation = { value: this.view.getCFI(index, target) }
+        this.view.addAnnotation(this.ttsAnnotation).catch?.(() => {})
+        this.view.renderer.scrollToAnchor?.(target, true)
+    }
+
+    // ---------- reading sessions & finishing ----------
+    #startSession() {
+        if (this.session) return
+        this.session = { id: uuid(), startedAt: Date.now(), seconds: 0, pages: 0, fractionStart: this.lastFraction ?? 0 }
+        this.sessionTimer = setInterval(() => {
+            if (document.hidden) return
+            this.session.seconds += 15
+            if (this.session.seconds % 60 === 0) this.#flushSession()
+        }, 15000)
+    }
+    #tickPages(fraction) {
+        if (!this.session) return
+        if (this.session.lastFraction != null && Math.abs(fraction - this.session.lastFraction) > 0.0005) this.session.pages++
+        this.session.lastFraction = fraction
+    }
+    #flushSession() {
+        if (!this.session || this.session.seconds < 15) return
+        const s = { ...this.session, endedAt: Date.now(), fractionEnd: this.lastFraction ?? this.session.fractionStart }
+        delete s.lastFraction
+        hostStore.saveSession(this.info.id, s)
+    }
+    #endSession() {
+        if (!this.session) return
+        clearInterval(this.sessionTimer)
+        this.#flushSession()
+        this.session = null
+    }
+    #celebrate() {
+        const key = 'dogear.finished.' + this.info.id
+        if (localStorage.getItem(key)) return
+        localStorage.setItem(key, '1')
+        hostStore.markFinished()
+        $('#finish-title').textContent = $('#title').textContent
+        $('#finish').hidden = false
+        this.#confetti()
+    }
+    #confetti() {
+        const c = $('#confetti'); const ctx = c.getContext('2d')
+        c.width = c.clientWidth; c.height = c.clientHeight
+        const colors = ['#c6f24e', '#ff5ca8', '#5b7cff', '#ffd23f', '#ff8a3d', '#b388ff']
+        const parts = Array.from({ length: 140 }, () => ({ x: Math.random() * c.width, y: -20 - Math.random() * c.height * 0.5, vx: (Math.random() - 0.5) * 2, vy: 2 + Math.random() * 3, r: 4 + Math.random() * 5, a: Math.random() * 6.28, va: (Math.random() - 0.5) * 0.3, col: colors[Math.floor(Math.random() * colors.length)] }))
+        const t0 = performance.now()
+        const frame = now => {
+            ctx.clearRect(0, 0, c.width, c.height)
+            for (const p of parts) { p.x += p.vx; p.y += p.vy; p.a += p.va; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.fillStyle = p.col; ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 0.6); ctx.restore() }
+            if (now - t0 < 4000 && !$('#finish').hidden) requestAnimationFrame(frame)
+        }
+        requestAnimationFrame(frame)
+    }
+
+    toast(msg, ms = 1800) {
+        const t = $('#toast'); t.textContent = msg; t.hidden = false
+        clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => t.hidden = true, ms)
     }
 
     // ---------- chrome ----------
@@ -540,7 +861,37 @@ class Reader {
         $('#chk-justify').addEventListener('change', e => this.#update({ justify: e.target.checked }))
         $('#chk-wake').addEventListener('change', e => this.#update({ keepScreenOn: e.target.checked }))
         $('#chk-define').addEventListener('change', e => this.#update({ defineOnSelect: e.target.checked }))
+        $('#chk-select').addEventListener('change', e => this.#update({ selectMode: e.target.checked }))
+        const langSel = $('#sel-lang')
+        langSel.innerHTML = LANGS.map(([c, n]) => `<option value="${c}">${n}</option>`).join('')
+        langSel.addEventListener('change', e => this.#update({ translateTo: e.target.value }))
+        $$('.chip.preset').forEach(c => c.addEventListener('click', () => { this.#update({ ...PRESETS[c.dataset.preset] }); this.toast(`${c.textContent.trim()} ✓`) }))
         $('#dict-close').addEventListener('click', () => this.closeDictionary())
+        $$('[data-dtab]').forEach(t => t.addEventListener('click', () => this.#dictTab(t.dataset.dtab)))
+        $$('#dict-card [data-hl]').forEach(d => d.addEventListener('click', () => this.saveHighlight(d.dataset.hl)))
+        $('#act-sentence').addEventListener('click', () => this.#expandPendingToSentence())
+        $('#act-note').addEventListener('click', () => this.openHighlightMenu(null))
+        $('#act-copy').addEventListener('click', () => this.#copy(this.pending?.range?.toString() || this.dictPhrase))
+        $$('#sel-bar [data-sel]').forEach(b => b.addEventListener('click', () => this.#selAction(b.dataset.sel)))
+        $$('#toc-tabs .tab').forEach(t => t.addEventListener('click', () => {
+            $$('#toc-tabs .tab').forEach(x => x.classList.toggle('active', x === t))
+            $('#toc-list').hidden = t.dataset.tab !== 'toc-list'; $('#hl-list').hidden = t.dataset.tab !== 'hl-list'
+        }))
+        $$('#hl-menu [data-hlm]').forEach(d => d.addEventListener('click', () => { this.hlmColor = d.dataset.hlm; $$('#hl-menu .dot').forEach(x => x.classList.toggle('active', x === d)) }))
+        $('#hlm-save').addEventListener('click', () => this.#saveHighlightMenu())
+        $('#hlm-delete').addEventListener('click', () => this.#deleteHighlightMenu())
+        $('#hlm-define').addEventListener('click', () => { const t = this.hlmTarget?.text || $('#hlm-text').textContent; this.closePanels(); this.define(t.split(/\s+/).slice(0, 4).join(' ')) })
+        // listen
+        $('#btn-listen').addEventListener('click', () => this.toggleListen())
+        $('#ls-toggle').addEventListener('click', () => this.listener?.toggle())
+        $('#ls-prev').addEventListener('click', () => this.listener?.prev())
+        $('#ls-next').addEventListener('click', () => this.listener?.next())
+        $('#ls-close').addEventListener('click', () => this.stopListen())
+        $$('.ls-rates button').forEach(b => b.addEventListener('click', () => { this.listener?.setRate(+b.dataset.rate); $$('.ls-rates button').forEach(x => x.classList.toggle('active', x === b)) }))
+        $('#finish-shelf').addEventListener('click', () => bridge.close())
+        $('#finish-stay').addEventListener('click', () => { $('#finish').hidden = true })
+        window.addEventListener('pagehide', () => this.#endSession())
+        document.addEventListener('visibilitychange', () => { if (document.hidden) this.#endSession(); else this.#startSession() })
 
         // search
         const input = $('#search-input')
@@ -572,6 +923,8 @@ class Reader {
         $('#chk-justify').checked = !!s.justify
         $('#chk-wake').checked = !!s.keepScreenOn
         $('#chk-define').checked = s.defineOnSelect !== false
+        $('#chk-select').checked = !!s.selectMode
+        $('#sel-lang').value = s.translateTo || defaultTarget()
     }
 
     #buildToc(items) {

@@ -1,10 +1,14 @@
-import { library, ACCEPT, formatLabel, detectFormat, toBlob } from './reader/store.js'
+import { library, sessions, highlights, computeStats, ACCEPT, formatLabel, detectFormat, toBlob } from './reader/store.js'
 
 const $ = s => document.querySelector(s)
+const $$ = s => Array.from(document.querySelectorAll(s))
 const grid = $('#grid'), empty = $('#empty'), fileInput = $('#file-input')
 const SORT_KEY = 'dogear.sort'
 let books = []
 let sheetBook = null
+let activeTag = null
+let query = ''
+const isFinished = b => !!b.finishedAt || (b.progress || 0) >= 0.985
 const urls = new Map()
 
 const toast = (msg, ms = 2500) => { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, ms) }
@@ -28,13 +32,15 @@ const render = () => {
     urls.clear()
     const sort = localStorage.getItem(SORT_KEY) || 'recent'
     $('#sort').value = sort
-    const list = [...books].sort((a, b) => sort === 'title' ? a.title.localeCompare(b.title)
+    const q = query.trim().toLowerCase()
+    const matches = b => (!activeTag || (b.tags || []).includes(activeTag)) && (!q || `${b.title} ${b.author} ${(b.tags || []).join(' ')}`.toLowerCase().includes(q))
+    const list = books.filter(b => !isFinished(b) && matches(b)).sort((a, b) => sort === 'title' ? a.title.localeCompare(b.title)
         : sort === 'author' ? (a.author || '￿').localeCompare(b.author || '￿') || a.title.localeCompare(b.title)
         : sort === 'added' ? b.addedAt - a.addedAt
         : Math.max(b.lastOpenedAt, b.addedAt) - Math.max(a.lastOpenedAt, a.addedAt))
 
     // Continue reading: most recently opened, unfinished book.
-    const current = [...books].filter(b => b.lastOpenedAt && (b.progress || 0) < 0.98).sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)[0]
+    const current = [...books].filter(b => b.lastOpenedAt && !isFinished(b)).sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)[0]
     $('#continue').hidden = !current
     if (current) {
         const url = coverUrl(current)
@@ -49,17 +55,59 @@ const render = () => {
         $('#continue-card').onclick = () => open(current)
     }
 
-    $('#shelf-eyebrow').hidden = !books.length
+    $('#shelf-head').hidden = !books.length
+    const tags = [...new Set(books.flatMap(b => b.tags || []))].sort()
+    const chips = $('#tag-chips'); chips.textContent = ''
+    if (tags.length) for (const t of [null, ...tags]) {
+        const c = document.createElement('button'); c.className = 'tag-chip' + (activeTag === t ? ' active' : ''); c.textContent = t ?? 'all'
+        c.addEventListener('click', () => { activeTag = t; render() }); chips.append(c)
+    }
+    const done = books.filter(b => isFinished(b) && matches(b)).sort((a, b) => (b.finishedAt || b.lastOpenedAt || 0) - (a.finishedAt || a.lastOpenedAt || 0))
+    $('#finished-sec').hidden = !done.length
+    const fg = $('#finished-grid'); fg.textContent = ''
+    for (const b of done) fg.append(makeCard(b))
+    renderStats()
 
     grid.textContent = ''
-    for (const b of list) {
+    if (!list.length && books.length) { const d = document.createElement('p'); d.className = 'muted'; d.textContent = q || activeTag ? 'nothing matches.' : 'everything here is finished 🎉'; grid.append(d) }
+    for (const b of list) grid.append(makeCard(b))
+    empty.hidden = books.length > 0
+    library.usage().then(u => { $('#storage').textContent = books.length && u && u.quota ? `${fmtSize(u.used)} of books · ${fmtSize(u.quota - u.used)} free` : '' })
+}
+
+const fmtMin = secs => { const m = Math.round(secs / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m` }
+const renderStats = async () => {
+    const list = await sessions.all().catch(() => [])
+    const st = computeStats(list)
+    const finished = books.filter(isFinished).length
+    const show = books.length > 0 && (st.sessions > 0 || finished > 0)
+    $('#stats').hidden = !show
+    if (!show) return
+    $('#st-today').textContent = fmtMin(st.todaySeconds)
+    $('#st-week').textContent = fmtMin(st.weekSeconds)
+    $('#st-streak').textContent = String(st.streak)
+    const stickers = []
+    if (st.streak >= 30) stickers.push(['pink', '30-day streak 🔥🔥'])
+    else if (st.streak >= 7) stickers.push(['pink', 'week streak 🔥'])
+    else if (st.streak >= 3) stickers.push(['sun', '3-day streak 🔥'])
+    if (st.todaySeconds >= 1800) stickers.push(['lime', '30 min today 💪'])
+    else if (st.todaySeconds >= 600) stickers.push(['lime', '10 min today ✨'])
+    if (finished >= 10) stickers.push(['blue', `${finished} books finished 🏆`])
+    else if (finished >= 1) stickers.push(['blue', finished === 1 ? 'first finish 🎉' : `${finished} finished 🎉`])
+    if (st.totalSeconds >= 36000) stickers.push(['lilac', '10 hours read 📚'])
+    if (st.pagesToday >= 50) stickers.push(['lilac', `${st.pagesToday} pages today`])
+    $('#st-stickers').innerHTML = stickers.map(([c, t]) => `<span class="${c}">${t}</span>`).join('')
+}
+
+const makeCard = b => {
+    {
         const card = document.createElement('button')
         const pct = pctOf(b)
         card.className = 'card' + (b.progress > 0 ? ' started' : '') + (pct >= 100 ? ' done' : '')
         const url = coverUrl(b)
         card.innerHTML = `<div class="cover">${url ? `<img alt="" src="${url}">` : `<div class="ph"><span>${esc(b.title)}</span>${b.author ? `<small>${esc(b.author)}</small>` : ''}</div>`}
             <i class="ear" aria-hidden="true"></i><span class="badge">${badgeFor(b)}</span>${b.progress > 0 ? `<div class="bar"><i style="width:${Math.max(1, pct)}%"></i></div>` : ''}</div>
-            <div class="t">${esc(b.title)}</div><div class="a">${esc(b.author || formatLabel(b.format))}</div>`
+            <div class="t">${esc(b.title)}</div><div class="a">${esc(b.author || formatLabel(b.format))}</div>${(b.tags || []).length ? `<div class="tags">${b.tags.map(t => `<i>${esc(t)}</i>`).join('')}</div>` : ''}`
         card.querySelector('img')?.addEventListener('error', e => {
             e.target.outerHTML = `<div class="ph"><span>${esc(b.title)}</span>${b.author ? `<small>${esc(b.author)}</small>` : ''}</div>`
             healCover(b)
@@ -71,10 +119,8 @@ const render = () => {
         card.addEventListener('touchstart', start, { passive: true })
         card.addEventListener('touchend', cancel); card.addEventListener('touchmove', cancel); card.addEventListener('touchcancel', cancel)
         card.addEventListener('contextmenu', e => { e.preventDefault(); showSheet(b) })
-        grid.append(card)
+        return card
     }
-    empty.hidden = list.length > 0
-    library.usage().then(u => { $('#storage').textContent = list.length && u && u.quota ? `${fmtSize(u.used)} of books · ${fmtSize(u.quota - u.used)} free` : '' })
 }
 
 const open = book => { location.href = `reader/index.html?id=${encodeURIComponent(book.id)}` }
@@ -83,6 +129,7 @@ const showSheet = book => {
     sheetBook = book
     $('#sheet-title').textContent = book.title
     $('#sheet-sub').textContent = [book.author, formatLabel(book.format), fmtSize(book.size), book.progressLabel].filter(Boolean).join(' · ')
+    $('#sheet [data-act="finished"]').textContent = isFinished(book) ? 'move back to the shelf' : 'mark as finished'
     $('#sheet').hidden = false; $('#sheet-scrim').hidden = false
     if (navigator.vibrate) navigator.vibrate(10)
 }
@@ -93,6 +140,11 @@ $('#sheet').addEventListener('click', async e => {
     const b = sheetBook
     if (!act || !b) return
     if (act === 'open') open(b)
+    else if (act === 'tags') {
+        const v = prompt('tags, comma separated (e.g. sci-fi, to read):', (b.tags || []).join(', '))
+        if (v !== null) { const tags = [...new Set(v.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))]; await library.update(b.id, { tags }); await reload(); toast(tags.length ? 'tagged ✓' : 'tags cleared') }
+    }
+    else if (act === 'finished') { await library.update(b.id, isFinished(b) ? { finishedAt: null, progress: Math.min(b.progress || 0, 0.97) } : { finishedAt: Date.now() }); await reload(); toast(isFinished(b) ? 'back on the shelf' : 'finished 🎉') }
     else if (act === 'details') alert(`${b.title}\n${b.author || 'Unknown author'}\n${formatLabel(b.format)} · ${fmtSize(b.size)}\n${b.progressLabel || 'Not started'} (${pctOf(b)}%)\nAdded ${new Date(b.addedAt).toLocaleString()}${b.sourceUrl ? '\n' + b.sourceUrl : ''}`)
     else if (act === 'delete') {
         if (confirm(`remove “${b.title}” from your shelf?`)) { await library.remove(b.id); urls.delete(b.id); await reload(); toast('gone 👋') }
@@ -120,7 +172,91 @@ fileInput.accept = ACCEPT
 fileInput.addEventListener('change', () => { importFiles([...fileInput.files]); fileInput.value = '' })
 $('#fab').addEventListener('click', () => fileInput.click())
 $('#sort').addEventListener('change', e => { localStorage.setItem(SORT_KEY, e.target.value); render() })
-$('#btn-url').addEventListener('click', async () => {
+$('#search').addEventListener('input', e => { query = e.target.value; render() })
+const showMore = () => { $('#more').hidden = false; $('#sheet-scrim').hidden = false }
+const hideMore = () => { $('#more').hidden = true; if ($('#sheet').hidden) $('#sheet-scrim').hidden = true }
+$('#btn-more').addEventListener('click', showMore)
+$('#sheet-scrim').addEventListener('click', hideMore)
+$('#more').addEventListener('click', e => {
+    const act = e.target.closest('[data-more]')?.dataset.more
+    hideMore()
+    if (act === 'find') openFind()
+    else if (act === 'url') addFromUrl()
+    else if (act === 'backup') backup()
+    else if (act === 'restore') $('#restore-input').click()
+    else if (act === 'help') { $('#help').hidden = false }
+})
+$('#help-close').addEventListener('click', () => { $('#help').hidden = true })
+$('#btn-find').addEventListener('click', () => openFind())
+$('#empty-find').addEventListener('click', () => openFind())
+
+// ---- backup / restore ----
+const backup = async () => {
+    busy(true)
+    try {
+        const { createBackup } = await import('./reader/backup.js')
+        const blob = await createBackup()
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = `dogear-backup-${new Date().toISOString().slice(0, 10)}.zip`
+        document.body.append(a); a.click(); a.remove()
+        setTimeout(() => URL.revokeObjectURL(a.href), 60000)
+        toast(`backup ready (${fmtSize(blob.size)}) — save it to Files or Drive`, 4000)
+    } catch (e) { console.error(e); toast('backup failed: ' + e.message, 4000) } finally { busy(false) }
+}
+$('#restore-input').addEventListener('change', async () => {
+    const f = $('#restore-input').files[0]; $('#restore-input').value = ''
+    if (!f) return
+    busy(true)
+    try {
+        const { restoreBackup } = await import('./reader/backup.js')
+        const r = await restoreBackup(f)
+        await reload()
+        toast(`restored: ${r.added} new, ${r.updated} merged ✨`, 4000)
+    } catch (e) { console.error(e); toast('restore failed: ' + e.message, 4000) } finally { busy(false) }
+})
+window.dogearBackup = { backup, restore: f => import('./reader/backup.js').then(m => m.restoreBackup(f)) }
+
+// ---- find free books ----
+let findSrc = 'gutenberg', findPage = 1, findBusy = false, catalogMod = null
+const openFind = async () => { $('#find').hidden = false; setTimeout(() => $('#find-q').focus(), 200); if (!$('#find-results').children.length) runFind(true) }
+$('#find-close').addEventListener('click', () => { $('#find').hidden = true })
+$('#find-q').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); runFind(true); $('#find-q').blur() } })
+$$('#find-tabs .tab').forEach(t => t.addEventListener('click', () => { findSrc = t.dataset.src; $$('#find-tabs .tab').forEach(x => x.classList.toggle('active', x === t)); runFind(true) }))
+$('#find-more').addEventListener('click', () => runFind(false))
+const runFind = async reset => {
+    if (findBusy) return
+    findBusy = true
+    catalogMod ??= await import('./reader/catalog.js')
+    const res = $('#find-results')
+    if (reset) { findPage = 1; res.innerHTML = '<p class="find-status">searching…</p>' }
+    $('#find-more').hidden = true
+    try {
+        const { items, more } = await catalogMod.SOURCES[findSrc].search($('#find-q').value, findPage)
+        if (reset) res.textContent = ''
+        if (!items.length && reset) res.innerHTML = '<p class="find-status">nothing found. try another word?</p>'
+        for (const it of items) {
+            const row = document.createElement('div'); row.className = 'find-item'
+            row.innerHTML = `<img alt="" loading="lazy"${it.cover ? ` src="${esc(it.cover)}"` : ''}><div class="fi-text"><div class="fi-t">${esc(it.title)}</div><div class="fi-a">${esc(it.author || '')}${it.language ? ` · ${esc(it.language)}` : ''}</div></div><button class="get">add</button>`
+            row.querySelector('img').addEventListener('error', e => { e.target.removeAttribute('src') })
+            const btn = row.querySelector('.get')
+            btn.addEventListener('click', async () => {
+                if (btn.classList.contains('done')) return
+                btn.textContent = '…'; btn.disabled = true
+                try {
+                    await catalogMod.downloadToShelf(findSrc, it, (got, total) => { btn.textContent = `${Math.round(got / total * 100)}%` })
+                    btn.textContent = 'added ✓'; btn.classList.add('done'); await reload(); library.persist()
+                } catch (e) { console.error(e); btn.textContent = 'add'; btn.disabled = false; toast(e.name === 'TypeError' ? 'that site blocked the download. open it in the browser instead.' : `couldn’t add: ${e.message}`, 4500) }
+            })
+            res.append(row)
+        }
+        $('#find-more').hidden = !more
+        findPage++
+    } catch (e) { console.error(e); if (reset) res.innerHTML = `<p class="find-status">${navigator.onLine ? 'couldn’t reach the catalog right now.' : 'you’re offline.'}</p>` }
+    finally { findBusy = false }
+}
+
+const addFromUrl = async () => {
     const url = prompt('Paste a direct link to an EPUB, PDF or other book file:')
     if (!url) return
     busy(true)
@@ -139,7 +275,13 @@ $('#btn-url').addEventListener('click', async () => {
         console.error(e)
         toast(e.name === 'TypeError' ? 'That site blocks downloads from web apps. Save the file in Safari first, then add it from Files.' : `Download failed: ${e.message}`, 5000)
     } finally { busy(false) }
-})
+}
+
+// Files shared to Dogear (Android share target) arrive via the service worker with ?shared=N
+{
+    const n = +new URLSearchParams(location.search).get('shared')
+    if (n > 0) { history.replaceState(null, '', location.pathname); setTimeout(() => toast(n === 1 ? 'shared book added ✨' : `${n} shared books added ✨`), 400) }
+}
 
 document.addEventListener('dragover', e => e.preventDefault())
 document.addEventListener('drop', e => { e.preventDefault(); importFiles([...e.dataTransfer.files]) })

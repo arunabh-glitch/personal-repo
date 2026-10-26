@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="color-scheme" content="light dark">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' blob: 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; media-src 'self' blob: data: https://api.dictionaryapi.dev https://*.wiktionary.org https://upload.wikimedia.org; connect-src 'self' blob: data: https://api.dictionaryapi.dev https://en.wiktionary.org; frame-src blob: data:; object-src blob: data:; worker-src 'self' blob:; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' blob: 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; media-src 'self' blob: data: https://api.dictionaryapi.dev https://*.wiktionary.org https://upload.wikimedia.org; connect-src 'self' blob: data: https://api.dictionaryapi.dev https://en.wiktionary.org https://api.mymemory.translated.net; frame-src blob: data:; object-src blob: data:; worker-src 'self' blob:; form-action 'none';">
 <title>Dogear</title>
 <link rel="stylesheet" href="reader.css">
 </head>
@@ -39,6 +39,7 @@
 
 <footer id="bottom-bar" class="bar hidden">
   <div id="progress-row">
+    <button id="btn-listen" class="icon small" aria-label="Listen"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-9 9v7a3 3 0 0 0 3 3h2v-8H5v-2a7 7 0 0 1 14 0v2h-3v8h2a3 3 0 0 0 3-3v-7a9 9 0 0 0-9-9z"/></svg></button>
     <button id="btn-prev-ch" class="icon small" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
     <input id="slider" type="range" min="0" max="1" step="0.0001" value="0" aria-label="Position in book">
     <button id="btn-next-ch" class="icon small" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
@@ -49,8 +50,9 @@
 <div id="scrim" class="hidden"></div>
 
 <aside id="toc-panel" class="panel side hidden">
-  <div class="panel-head"><h2>Contents</h2><button class="icon close" data-close="toc-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
+  <div class="panel-head"><div class="tabs" id="toc-tabs"><button class="tab active" data-tab="toc-list">contents</button><button class="tab" data-tab="hl-list">highlights</button></div><button class="icon close" data-close="toc-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
   <div id="toc-list" class="panel-body"></div>
+  <div id="hl-list" class="panel-body" hidden></div>
 </aside>
 
 <aside id="search-panel" class="panel side hidden">
@@ -65,6 +67,14 @@
   <div class="grab"></div>
   <div class="panel-head"><h2>Display</h2><button class="icon close" data-close="settings-panel" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
   <div class="panel-body">
+    <div class="row">
+      <span class="label">Presets</span>
+      <div class="chips">
+        <button class="chip preset" data-preset="cosy">🧸 cosy</button>
+        <button class="chip preset" data-preset="focus">🎯 focus</button>
+        <button class="chip preset" data-preset="night">🦉 night owl</button>
+      </div>
+    </div>
     <div class="row">
       <span class="label">Paper</span>
       <div class="chips" id="theme-chips">
@@ -115,6 +125,14 @@
       <label class="switch"><input type="checkbox" id="chk-define"><span></span></label>
     </div>
     <div class="row">
+      <span class="label">Select text instead <small class="sub">for copying or highlighting passages</small></span>
+      <label class="switch"><input type="checkbox" id="chk-select"><span></span></label>
+    </div>
+    <div class="row">
+      <span class="label">Translate to</span>
+      <select id="sel-lang"></select>
+    </div>
+    <div class="row">
       <span class="label">Keep the screen awake</span>
       <label class="switch"><input type="checkbox" id="chk-wake"><span></span></label>
     </div>
@@ -133,9 +151,56 @@
       <button id="dict-close" class="icon" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
     </div>
   </div>
+  <div class="tabs dict-tabs"><button class="tab active" data-dtab="meaning">meaning</button><button class="tab" data-dtab="translate">translate</button></div>
   <div id="dict-body" class="dict-body"></div>
+  <div id="tr-body" class="dict-body" hidden></div>
+  <div class="dict-actions-row">
+    <span class="hl-dots"><button class="dot lime" data-hl="lime" aria-label="Highlight lime"></button><button class="dot pink" data-hl="pink" aria-label="Highlight pink"></button><button class="dot blue" data-hl="blue" aria-label="Highlight blue"></button></span>
+    <button id="act-sentence" class="mini">whole sentence</button>
+    <button id="act-note" class="mini">+ note</button>
+    <button id="act-copy" class="mini">copy</button>
+  </div>
   <div class="dict-foot"><span id="dict-source" class="dict-src"></span><button id="dict-more" class="link" hidden>Open in Wiktionary ↗</button></div>
 </section>
+
+<div id="sel-bar" class="sel-bar" hidden>
+  <button data-sel="define">meaning</button><button data-sel="translate">translate</button><button data-sel="highlight">highlight</button><button data-sel="copy">copy</button>
+</div>
+
+<section id="hl-menu" class="panel sheet hidden">
+  <div class="grab"></div>
+  <div class="panel-head"><h2>highlight</h2><button class="icon close" data-close="hl-menu" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
+  <div class="panel-body hl-menu-body">
+    <blockquote id="hlm-text"></blockquote>
+    <textarea id="hlm-note" rows="3" placeholder="add a note…"></textarea>
+    <div class="row-inline">
+      <span class="hl-dots"><button class="dot lime" data-hlm="lime"></button><button class="dot pink" data-hlm="pink"></button><button class="dot blue" data-hlm="blue"></button><button class="dot sun" data-hlm="sun"></button></span>
+      <button id="hlm-define" class="mini">meaning</button>
+      <button id="hlm-delete" class="mini danger">delete</button>
+      <button id="hlm-save" class="btn small">save</button>
+    </div>
+  </div>
+</section>
+
+<div id="listen-bar" class="listen-bar" hidden>
+  <button id="ls-prev" class="icon small" aria-label="Previous sentence"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+  <button id="ls-toggle" class="icon play" aria-label="Play or pause"><svg class="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><svg class="i-pause" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></button>
+  <button id="ls-next" class="icon small" aria-label="Next sentence"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+  <div class="ls-rates"><button data-rate="0.8">0.8×</button><button data-rate="1" class="active">1×</button><button data-rate="1.2">1.2×</button><button data-rate="1.5">1.5×</button></div>
+  <button id="ls-close" class="icon small close" aria-label="Stop listening"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+</div>
+
+<div id="finish" class="finish" hidden>
+  <canvas id="confetti"></canvas>
+  <div class="finish-card">
+    <div class="sticker-big">finished! 🎉</div>
+    <h2 id="finish-title"></h2>
+    <p class="muted">that’s a whole book. respect.</p>
+    <div class="row-inline center"><button id="finish-shelf" class="btn small">back to shelf</button><button id="finish-stay" class="mini">stay here</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
 
 <script src="boot.js"></script>
 <script src="polyfills.js"></script>
