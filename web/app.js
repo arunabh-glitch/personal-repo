@@ -171,27 +171,32 @@ $('#sheet').addEventListener('click', async e => {
     hideSheet()
 })
 
-// ---- Lumi's poses: reading by default, happy when something good happens, under a blanket when you've been away ----
-const POSE = { reading: 'reader/brand/lumi-reading.png', happy: 'reader/brand/lumi-happy.png', sleepy: 'reader/brand/lumi-blanket.png' }
+const POSES = {"reading": {"w": 406, "h": 396, "eyes": [43.8, 45.1], "spark": [88.2, 13.3], "blink": true}, "lying": {"w": 298, "h": 204, "eyes": [30.9, 56.9], "spark": [64.1, 13.7], "blink": true}, "happy": {"w": 251, "h": 217, "eyes": [53.0, 36.6], "spark": [50.4, 36.4], "blink": false}, "stack": {"w": 257, "h": 230, "eyes": [57.4, 32.4], "spark": [82.3, 13.7], "blink": true}, "blanket": {"w": 326, "h": 208, "eyes": [55.5, 48.6], "spark": [78.5, 24.0], "blink": false}, "thinking": {"w": 241, "h": 259, "eyes": [46.5, 43.4], "spark": [80.5, 16.2], "blink": true}}
+const setPose = (el, name) => {
+    const m = POSES[name]; if (!el || !m || el.dataset.pose === name) return
+    el.dataset.pose = name; el.toggleAttribute('data-blink', m.blink)
+    el.style.setProperty('--eyes', `${m.eyes[0]}% ${m.eyes[1]}%`); el.style.setProperty('--spark', `${m.spark[0]}% ${m.spark[1]}%`); el.style.aspectRatio = `${m.w}/${m.h}`
+    for (const layer of ['body', 'eyes', 'spark']) { const img = el.querySelector('.l-' + layer); img.src = `reader/brand/lumi-${name}-${layer}.png`; img.width = m.w; img.height = m.h }
+}
+// ---- Lumi's moods: reading by default, happy when something good happens, under a blanket when you've been away ----
 const mascotLife = () => {
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches
     const art = () => $('.empty-art')
-    const pose = name => { const img = art(); if (!img || img.dataset.pose === name) return; img.dataset.pose = name; img.src = POSE[name] }
     let lastTouch = Date.now(), asleep = false, timer = null
     const act = (name = 'happy', ms = 1800) => {
         if (asleep) wake()
         clearTimeout(timer)
-        pose(name)
-        const img = art(); if (img && !still) { img.classList.remove('is-happy'); void img.offsetWidth; img.classList.add('is-happy') }
+        setPose(art(), name)
+        const el = art(); if (el && !still) { el.classList.remove('is-happy'); void el.offsetWidth; el.classList.add('is-happy') }
         $('.brand-mark')?.classList.add('is-happy')
-        timer = setTimeout(() => { pose(asleep ? 'sleepy' : 'reading'); art()?.classList.remove('is-happy'); $('.brand-mark')?.classList.remove('is-happy') }, ms)
+        timer = setTimeout(() => { setPose(art(), asleep ? 'blanket' : 'reading'); art()?.classList.remove('is-happy'); $('.brand-mark')?.classList.remove('is-happy') }, ms)
     }
-    const nap = () => { asleep = true; pose('sleepy') }
-    const wake = () => { if (!asleep) return; asleep = false; pose('reading') }
+    const nap = () => { asleep = true; setPose(art(), 'blanket') }
+    const wake = () => { if (!asleep) return; asleep = false; setPose(art(), 'reading') }
     setInterval(() => { if (document.visibilityState === 'visible' && !asleep && Date.now() - lastTouch > 60000) nap() }, 5000)
     document.addEventListener('pointerdown', () => { lastTouch = Date.now(); if (asleep) wake() }, { passive: true })
     $('.brand-mark')?.addEventListener('click', () => act('happy'))
-    for (const k of ['happy', 'sleepy']) { const i = new Image(); i.src = POSE[k] }
+    for (const k of ['happy', 'blanket']) for (const l of ['body', 'eyes', 'spark']) { const i = new Image(); i.src = `reader/brand/lumi-${k}-${l}.png` }
     return { act }
 }
 const mascot = mascotLife()
