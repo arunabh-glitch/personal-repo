@@ -285,6 +285,7 @@ class Reader {
         doc.addEventListener('click', e => this.#onDocClick(e, doc))
         doc.addEventListener('keydown', e => this.#onKey(e))
         doc.addEventListener('selectionchange', () => this.#onSelectionChange(doc))
+        this.#installPinch(doc)
         this.#installLongPress(doc, (x, y) => {
             const range = wordRangeAt(doc, x, y)
             if (!range) return
@@ -448,6 +449,22 @@ class Reader {
     goToFraction(f) { this.kind === 'pdf' ? this.pdf.goToFraction(f) : this.view.goToFraction(f).catch(console.error) }
 
     // ---------- press & hold ----------
+    /** Two fingers on a book page: grow or shrink the text instead of zooming the layout. */
+    #installPinch(doc) {
+        for (const ev of ['gesturestart', 'gesturechange']) doc.addEventListener(ev, e => e.preventDefault())
+        const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+        let d0 = null, size0 = 0, last = 0, shown = 0
+        doc.addEventListener('touchstart', e => { if (e.touches.length === 2) { d0 = dist(e.touches); size0 = this.settings.fontSize; shown = size0 } }, { passive: true })
+        doc.addEventListener('touchmove', e => {
+            if (!d0 || e.touches.length !== 2) return
+            if (e.cancelable) e.preventDefault()
+            const next = Math.max(10, Math.min(40, Math.round(size0 * dist(e.touches) / d0)))
+            const now = Date.now()
+            if (next !== shown && now - last > 120) { last = now; shown = next; this.#update({ fontSize: next }); this.toast(`${next}px`, 700) }
+        }, { passive: false })
+        const end = () => { if (d0 != null) { d0 = null; this.suppressTapUntil = Date.now() + 400 } }
+        doc.addEventListener('touchend', end); doc.addEventListener('touchcancel', end)
+    }
     #installLongPress(el, onPress) {
         let timer = null, start = null, fired = false
         const cancel = () => { clearTimeout(timer); timer = null }
@@ -1028,6 +1045,8 @@ class Reader {
         $$('.ls-rates button').forEach(b => b.addEventListener('click', () => { this.listener?.setRate(+b.dataset.rate); $$('.ls-rates button').forEach(x => x.classList.toggle('active', x === b)); $('#voice-rate').value = b.dataset.rate; $('#voice-rate-val').textContent = (+b.dataset.rate).toFixed(2).replace(/0$/, '') + '×' }))
         $('#finish-shelf').addEventListener('click', () => bridge.close())
         $('#finish-stay').addEventListener('click', () => { $('#finish').hidden = true })
+        // the chrome never zooms; pinching a book page changes the text size instead (see #installPinch)
+        for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, e => e.preventDefault())
         // keep the page exactly as tall as the visible viewport (browser toolbars, keyboard, Android nav bars)
         const fitViewport = () => { const h = window.visualViewport?.height || window.innerHeight; if (h > 200) document.documentElement.style.setProperty('--vvh', Math.round(h) + 'px') }
         fitViewport()

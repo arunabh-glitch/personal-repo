@@ -201,6 +201,8 @@ const mascotLife = () => {
     return { act: (name = 'excited', ms = 1200) => act(name, ms, true) }
 }
 const mascot = mascotLife()
+// no pinch zoom on the shelf (iOS ignores the viewport meta; the gesture events are what it honours)
+for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, e => e.preventDefault())
 
 const reload = async () => { books = await library.all(); allSessions = await sessions.all().catch(() => []); words = await vocab.all().catch(() => []); render() }
 
