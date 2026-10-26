@@ -172,6 +172,7 @@ class Reader {
         this.#renderHighlightList()
         this.#startSession()
         phase('ready')
+        if (this.kind !== 'pdf') Listener.preload().catch(() => {})
         $('#loading').hidden = true
         bridge.onReady()
         bridge.keepScreenOn(this.settings.keepScreenOn)
@@ -809,7 +810,7 @@ class Reader {
                 if (st === 'idle') this.#ttsHighlight(null)
             })
             this.listener.addEventListener('done', () => this.toast('end of book'))
-            this.listener.addEventListener('error', () => this.toast('speech isn’t available right now'))
+            this.listener.addEventListener('error', e => this.toast(e.detail === 'stalled' ? 'no speech is coming from the device. check the ringer switch and volume, then try again' : 'speech isn’t available right now', 4000))
         }
         if (!this.listener.supported) { this.toast('no voices on this device'); return }
         $$('.ls-rates button').forEach(x => x.classList.toggle('active', +x.dataset.rate === this.listener.rate))

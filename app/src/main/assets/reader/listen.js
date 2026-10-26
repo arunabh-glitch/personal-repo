@@ -41,23 +41,14 @@ export class Listener extends EventTarget {
     }
     get supported() { return !!this.synth && 'SpeechSynthesisUtterance' in globalThis }
 
-    // iOS: speech output follows the ringer switch unless a media element is playing, which moves the
-    // page to the "playback" audio session. A looping second of silence does that while we read aloud.
-    #silentAudio() {
-        const sr = 8000, n = 8000, buf = new Uint8Array(44 + n), dv = new DataView(buf.buffer)
-        const str = (o, t) => { for (let i = 0; i < t.length; i++) buf[o + i] = t.charCodeAt(i) }
-        str(0, 'RIFF'); dv.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt '); dv.setUint32(16, 16, true)
-        dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, sr, true); dv.setUint32(28, sr, true)
-        dv.setUint16(32, 1, true); dv.setUint16(34, 8, true); str(36, 'data'); dv.setUint32(40, n, true); buf.fill(128, 44)
-        const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })))
-        a.loop = true; a.setAttribute('playsinline', ''); a.preload = 'auto'
-        return a
-    }
-    #audioOn() { try { this.keepAlive ??= this.#silentAudio(); this.keepAlive.play()?.catch?.(() => {}) } catch { /* no audio element support */ } }
-    #audioOff() { try { this.keepAlive?.pause() } catch { /* ignore */ } }
-    // iOS only speaks if the first utterance of a page is queued inside a user gesture; our start() awaits before
-    // the first real sentence, so queue a silent one synchronously here.
-    #prime() { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; this.synth.speak(u) } catch { /* ignore */ } }
+    // The foliate text-to-speech helpers are loaded ahead of time so that start() can reach its first
+    // speak() synchronously inside the user's tap: iOS refuses the first utterance of a page otherwise.
+    static mods = null
+    static preload() { return Listener.mods ??= Promise.all([import('./foliate/tts.js'), import('./foliate/text-walker.js')]).then(([a, b]) => (Listener.loaded = { TTS: a.TTS, textWalker: b.textWalker })) }
+    // When the text cannot be ready synchronously (PDF pages, first use), an empty utterance queued in the tap unlocks speech.
+    #prime() { try { this.synth.speak(new SpeechSynthesisUtterance('')) } catch { /* ignore */ } }
+    // iOS leaves the synthesizer "paused" after interruptions; nothing plays until it is resumed.
+    #unstick() { try { if (this.synth.paused) this.synth.resume() } catch { /* ignore */ } }
     // cancel() immediately followed by speak() drops the utterance on iOS; restart after a tick.
     #restart(manual) { this.synth.cancel(); clearTimeout(this.restartTimer); this.restartTimer = setTimeout(() => this.#speakCurrent(manual), 80) }
 
@@ -67,27 +58,29 @@ export class Listener extends EventTarget {
 
     async start() {
         if (!this.supported) throw new Error('This device has no text-to-speech voices.')
-        this.#audioOn()
-        if (this.synth.speaking || this.synth.pending) this.synth.cancel(); else this.#prime()
-        if (this.pdf) await this.#loadPdfPage(this.pdf.current)
-        else await this.#loadSection(true)
+        this.#unstick()
+        if (this.synth.speaking || this.synth.pending) this.synth.cancel()
+        this.stalls = 0
+        if (this.pdf) { this.#prime(); await this.#loadPdfPage(this.pdf.current) }
+        else if (!this.#loadSectionSync(true)) { this.#prime(); await Listener.preload(); this.#loadSectionSync(true) }
         if (!this.queue.length) { this.stop(); return }
         this.#setState('playing')
         this.#speakCurrent()
     }
-    pause() { if (this.state !== 'playing') return; this.synth.cancel(); this.#audioOff(); this.#setState('paused') }
-    resume() { if (this.state !== 'paused') return; this.#audioOn(); this.#setState('playing'); this.#speakCurrent() }
+    pause() { if (this.state !== 'playing') return; this.synth.cancel(); this.#setState('paused') }
+    resume() { if (this.state !== 'paused') return; this.#unstick(); this.#setState('playing'); this.#speakCurrent() }
     toggle() { this.state === 'playing' ? this.pause() : this.state === 'paused' ? this.resume() : this.start() }
-    stop() { clearTimeout(this.restartTimer); clearTimeout(this.watchdog); this.synth?.cancel(); this.#audioOff(); this.queue = []; this.pos = 0; this.onHighlight(null); this.#setState('idle') }
+    stop() { clearTimeout(this.restartTimer); clearTimeout(this.watchdog); this.synth?.cancel(); this.queue = []; this.pos = 0; this.onHighlight(null); this.#setState('idle') }
     next() { if (this.state === 'idle') return; this.pos++; this.#restart(true) }
     prev() { if (this.state === 'idle') return; this.pos = Math.max(0, this.pos - 1); this.#restart(true) }
 
     // ----- reflowable books (foliate) -----
-    async #loadSection(fromVisible) {
-        const { TTS } = await import('./foliate/tts.js')
-        const { textWalker } = await import('./foliate/text-walker.js')
+    /** Builds the sentence queue from the current section. Returns false when the helpers are not loaded yet. */
+    #loadSectionSync(fromVisible) {
+        if (!Listener.loaded) { Listener.preload(); return false }
+        const { TTS, textWalker } = Listener.loaded
         const content = this.view.renderer.getContents()[0]
-        if (!content) { this.queue = []; return }
+        if (!content) { this.queue = []; return true }
         this.doc = content.doc; this.index = content.index
         this.tts = new TTS(this.doc, textWalker, range => this.onHighlight(range), 'sentence')
         const range = fromVisible ? this.view.lastLocation?.range : null
@@ -95,7 +88,9 @@ export class Listener extends EventTarget {
         try { ssml = range && range.startContainer.getRootNode() === this.doc ? this.tts.from(range) : this.tts.start() } catch { ssml = this.tts.start() }
         this.queue = ssml ? parseSSML(ssml) : []
         this.pos = 0
+        return true
     }
+    async #loadSection(fromVisible) { await Listener.preload(); this.#loadSectionSync(fromVisible) }
     async #nextBlock() {
         const ssml = this.tts?.next()
         if (ssml) { this.queue = parseSSML(ssml); this.pos = 0; return this.queue.length > 0 || this.#nextBlock() }
@@ -144,10 +139,9 @@ export class Listener extends EventTarget {
         if (manual && this.state !== 'playing') this.#setState('playing')
         const u = new SpeechSynthesisUtterance(seg.text)
         u.rate = this.rate; u.lang = this.lang || 'en'
-        const voice = this.#voice()
-        if (voice) u.voice = voice
+        // No explicit voice: on iOS a listed-but-not-installed voice plays silence and never ends. The system picks one for the language.
         const advance = () => { if (this.state === 'playing' && this.current === u) { clearTimeout(this.watchdog); this.pos++; this.#speakCurrent() } }
-        u.onend = advance
+        u.onend = () => { this.stalls = 0; advance() }
         u.onerror = e => {
             if (e.error === 'interrupted' || e.error === 'canceled') return
             console.warn('tts', e.error)
@@ -155,16 +149,21 @@ export class Listener extends EventTarget {
             advance()
         }
         this.current = u
+        this.#unstick()
         this.synth.speak(u)
-        // iOS sometimes never fires onend (screen lock, interruptions); move on once the sentence must be over
+        // Stall guard: when no end event arrives in the time the sentence could possibly take, retry it once
+        // (a stuck queue usually clears with cancel + speak); after three stalled sentences in a row, give up loudly.
         clearTimeout(this.watchdog)
-        const expect = () => { if (this.current !== u || this.state !== 'playing') return; if (this.synth.speaking) { this.watchdog = setTimeout(expect, 2000); return } advance() }
-        this.watchdog = setTimeout(expect, seg.text.length * 100 / this.rate + 2500)
+        const stalled = () => {
+            if (this.current !== u || this.state !== 'playing') return
+            if (this.stallAt !== this.pos) { this.stallAt = this.pos; this.stallTries = 0 }
+            if (this.stallTries++ < 1) { this.synth.cancel(); this.#unstick(); setTimeout(() => this.#speakCurrent(true), 150); return }
+            this.stalls = (this.stalls || 0) + 1
+            if (this.stalls >= 3) { this.stop(); this.dispatchEvent(new CustomEvent('error', { detail: 'stalled' })); return }
+            advance()
+        }
+        this.watchdog = setTimeout(stalled, this.stallBudget(seg))
     }
-    #voice() {
-        const voices = this.synth.getVoices?.() || []
-        const want = (this.lang || 'en').toLowerCase()
-        return voices.find(v => v.lang.toLowerCase() === want && v.localService) || voices.find(v => v.lang.toLowerCase().startsWith(want.split('-')[0]) && v.localService)
-            || voices.find(v => v.lang.toLowerCase().startsWith(want.split('-')[0])) || null
-    }
+    /** Milliseconds a sentence may take before it counts as stalled. */
+    stallBudget(seg) { return seg.text.length * 90 / this.rate + 3000 }
 }
