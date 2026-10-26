@@ -149,7 +149,7 @@ const friendly = e => {
     if (chatConfig.provider === 'lumi') {
         if (e.status === 429) return 'i need a breather. ask again in a minute?'
         if (e.status === 403) return 'this copy of the app can’t reach my model. use your own key in settings?'
-        if (e.status === 503 || e.status === 502) return 'my model is napping right now. try again later, or use your own key in settings.'
+        if (e.status === 503 || e.status === 502 || e.status === 404) return 'my model is napping right now. try again later, or use your own key in settings.'
         if (e.status === 0 || e instanceof TypeError) return 'can’t reach my model. are you online?'
         return e.message ? `hmm: ${e.message}` : 'something went wrong.'
     }
