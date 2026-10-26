@@ -76,9 +76,17 @@ export class Companion {
     greet(fraction = 0) {
         if (this.greeted || !this.enabled) return; this.greeted = true
         const h = this.clock().getHours()
-        if (this.late) { this.saidLate = true; this.pose('blanket'); setTimeout(() => this.say(pick(LINES.late), 5000), 1500); return }
+        if (this.late) { this.saidLate = true; this.pose('blanket'); setTimeout(() => this.say(pick(LINES.late), 5000), 1500); this.#hintChat(8000); return }
         const line = fraction > 0.04 ? pick(LINES.resume).replace('{pct}', Math.round(fraction * 100) + '%') : pick(h < 12 ? LINES.morning : h < 18 ? LINES.afternoon : LINES.evening)
         setTimeout(() => { this.say(line, 4000); this.hop() }, 1500)
+        this.#hintChat(7000)
+    }
+    // once, a little after the greeting: tell the reader Lumi can be tapped to talk
+    #hintChat(delay) {
+        if (!this.onTap) return
+        let seen = false; try { seen = !!localStorage.getItem('lumi.chat.hinted') } catch { /* ignore */ }
+        if (seen) return
+        setTimeout(() => { if (this.enabled && !this.root.classList.contains('tucked') && this.say('tap me anytime to chat about the book.', 4500)) { try { localStorage.setItem('lumi.chat.hinted', '1') } catch { /* ignore */ } } }, delay)
     }
     react(kind, data = {}) {
         if (!this.enabled) return
@@ -108,10 +116,10 @@ export class Companion {
     }
     tap() {
         if (!this.enabled) return
+        // with a chat wired up, a tap is a knock: wake up if needed, hop, and open the conversation right away
+        if (this.onTap) { this.asleep = false; this.hush(); this.pose('happy', 1800); this.hop(); this.onTap(); return }
         if (this.asleep || this.late) { this.say(pick(LINES.tapSleepy), 2500); if (this.asleep) this.#wakeIfNeeded(); return }
         this.pose('happy', 1800); this.hop(); this.say(pick(LINES.tap), 2200)
-        // when a chat is wired up, a tap says hi and then opens the conversation
-        if (this.onTap) { clearTimeout(this.tapTimer); this.tapTimer = setTimeout(() => this.onTap(), 650) }
     }
     destroy() { clearInterval(this.timer) }
 }
