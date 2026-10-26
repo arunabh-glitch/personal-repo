@@ -135,7 +135,7 @@ body:not([data-kind="pdf"]) .pdf-only { display: none; }
 
 /* dictionary */
 .panel.dict { z-index: 44; max-height: 58vh; transition: transform 0.5s cubic-bezier(.34,1.45,.64,1); }
-.panel.sheet.dict.top { top: 0; bottom: auto; border-radius: 0 0 var(--radius) var(--radius); border-top: 0; border-bottom: 2px solid var(--line); padding-top: var(--sat); padding-bottom: 0; flex-direction: column; }
+.panel.sheet.dict.top { top: 0; bottom: auto; border-radius: 0 0 var(--radius) var(--radius); border-top: 0; border-bottom: 2px solid var(--line); padding-top: calc(var(--sat) + 8px); padding-bottom: 0; flex-direction: column; transition: transform 0.35s cubic-bezier(.2,.8,.2,1); }
 .panel.sheet.dict.top.hidden { transform: translateY(-110%); }
 .panel.sheet.dict.top .grab { order: 99; margin: 6px auto 10px; }
 .dict-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 8px 10px 0 22px; gap: 8px; }
