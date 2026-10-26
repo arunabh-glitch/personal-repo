@@ -285,6 +285,8 @@ body[data-theme="light"] .lumi, body[data-theme="sepia"] .lumi { filter: drop-sh
 .comp-lumi { width: 54px; cursor: pointer; }
 .comp-bubble { max-width: min(230px, 70vw); background: var(--card); color: var(--ink); border: 2px solid var(--line); border-radius: 16px 16px 4px 16px; padding: 8px 12px; font-family: var(--ui); font-size: 13px; font-weight: 600; line-height: 1.35; box-shadow: var(--shadow); margin-right: 6px; }
 .comp-bubble.pop { animation: pop 0.3s cubic-bezier(.34,1.56,.64,1); }
+.comp-chat { display: inline-block; vertical-align: middle; margin: -2px 0 0 8px; padding: 3px 10px; border-radius: 999px; background: var(--pink); color: #fff; border: 2px solid var(--line); font: inherit; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; box-shadow: 2px 2px 0 var(--ink); }
+.comp-chat:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink); }
 .companion.listening .l-spark { animation: pulse 0.9s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .lumi, .lumi *, .comp-bubble { animation: none !important; } }
 

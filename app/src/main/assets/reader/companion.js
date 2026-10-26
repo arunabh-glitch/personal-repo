@@ -54,9 +54,12 @@ export class Companion {
         if (ms) this.poseTimer = setTimeout(() => setPose(this.figure, this.baseline), ms)
     }
     hop() { if (this.reduceMotion) return; this.figure.classList.remove('is-happy'); void this.figure.offsetWidth; this.figure.classList.add('is-happy'); setTimeout(() => this.figure.classList.remove('is-happy'), 800) }
-    say(text, ms = 3600) {
+    say(text, ms = 3600, { chat = false } = {}) {
         if (!this.enabled || !text) return false
-        this.bubble.textContent = text; this.bubble.hidden = false
+        this.bubble.textContent = text
+        // a visible way into the conversation, right in the bubble
+        if (chat && this.onTap) { const b = document.createElement('button'); b.type = 'button'; b.className = 'comp-chat'; b.textContent = 'chat'; b.setAttribute('aria-label', 'Chat with Lumi'); this.bubble.append(b) }
+        this.bubble.hidden = false
         this.bubble.classList.remove('pop'); void this.bubble.offsetWidth; this.bubble.classList.add('pop')
         clearTimeout(this.sayTimer); this.sayTimer = setTimeout(() => this.hush(), ms)
         this.lastSaid = Date.now(); return true
@@ -78,7 +81,7 @@ export class Companion {
         const h = this.clock().getHours()
         if (this.late) { this.saidLate = true; this.pose('blanket'); setTimeout(() => this.say(pick(LINES.late), 5000), 1500); this.#hintChat(8000); return }
         const line = fraction > 0.04 ? pick(LINES.resume).replace('{pct}', Math.round(fraction * 100) + '%') : pick(h < 12 ? LINES.morning : h < 18 ? LINES.afternoon : LINES.evening)
-        setTimeout(() => { this.say(line, 4000); this.hop() }, 1500)
+        setTimeout(() => { this.say(line, 4500, { chat: true }); this.hop() }, 1500)
         this.#hintChat(7000)
     }
     // once, a little after the greeting: tell the reader Lumi can be tapped to talk
@@ -86,7 +89,7 @@ export class Companion {
         if (!this.onTap) return
         let seen = false; try { seen = !!localStorage.getItem('lumi.chat.hinted') } catch { /* ignore */ }
         if (seen) return
-        setTimeout(() => { if (this.enabled && !this.root.classList.contains('tucked') && this.say('tap me twice to chat about the book.', 4500)) { try { localStorage.setItem('lumi.chat.hinted', '1') } catch { /* ignore */ } } }, delay)
+        setTimeout(() => { if (this.enabled && !this.root.classList.contains('tucked') && this.say('want to talk about the book?', 5000, { chat: true })) { try { localStorage.setItem('lumi.chat.hinted', '1') } catch { /* ignore */ } } }, delay)
     }
     react(kind, data = {}) {
         if (!this.enabled) return
@@ -120,8 +123,8 @@ export class Companion {
         const now = Date.now()
         if (this.onTap && now - (this.lastTap || 0) < 3500) { this.openChat(); return }
         this.lastTap = now
-        if (this.asleep || this.late) { if (this.asleep) { this.asleep = false; this.pose(this.baseline) } this.say(pick(LINES.tapSleepy), 3000); return }
-        this.pose('happy', 1800); this.hop(); this.say(pick(LINES.tap), 3000)
+        if (this.asleep || this.late) { if (this.asleep) { this.asleep = false; this.pose(this.baseline) } this.say(pick(LINES.tapSleepy), 3500, { chat: true }); return }
+        this.pose('happy', 1800); this.hop(); this.say(pick(LINES.tap), 3500, { chat: true })
     }
     openChat() { if (!this.onTap) return; this.lastTap = 0; this.asleep = false; this.hush(); this.pose('happy', 1800); this.hop(); this.onTap() }
     destroy() { clearInterval(this.timer) }
