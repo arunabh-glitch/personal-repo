@@ -21,11 +21,12 @@ h1, h2 { font-family: var(--display); margin: 0; letter-spacing: -0.02em; font-v
 
 /* soft colour blobs in the background */
 .blobs { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-.blobs i { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.55; }
-.b1 { width: 60vw; height: 60vw; left: -20vw; top: -10vh; background: var(--lilac); }
-.b2 { width: 50vw; height: 50vw; right: -15vw; top: 20vh; background: var(--pink); opacity: 0.35; }
-.b3 { width: 55vw; height: 55vw; left: 20vw; bottom: -20vh; background: var(--lime); opacity: 0.4; }
-@media (prefers-color-scheme: dark) { .blobs i { opacity: 0.22; } }
+/* radial gradients rather than filter: blur — blurred layers inside a fixed container get clipped with a hard edge on iOS */
+.blobs i { position: absolute; border-radius: 50%; opacity: 0.55; --c: var(--lilac); background: radial-gradient(circle at center, var(--c) 0%, transparent 68%); }
+.b1 { width: 90vw; height: 90vw; left: -35vw; top: -25vh; --c: var(--lilac); }
+.b2 { width: 80vw; height: 80vw; right: -30vw; top: 12vh; --c: var(--pink); opacity: 0.32; }
+.b3 { width: 85vw; height: 85vw; left: 5vw; bottom: -35vh; --c: var(--lime); opacity: 0.3; }
+@media (prefers-color-scheme: dark) { .blobs i { opacity: 0.16; } .b3 { --c: var(--blue); opacity: 0.14; } }
 
 .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 18px 6px; max-width: 1100px; margin: 0 auto; }
 .brand { display: flex; align-items: center; gap: 12px; min-height: 52px; }
