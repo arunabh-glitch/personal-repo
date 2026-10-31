@@ -137,26 +137,39 @@ export class PageCurl {
         lctx.beginPath(); lctx.rect(-far, -far, far, 2 * far); lctx.clip()
         lctx.transform(-1, 0, PI * R1, 1, PI * (RC - R1 * vC), 0); toFold(lctx); lctx.fillRect(0, 0, W, H)
         lctx.restore()
-        // 2b. the roll, as thin strips. Seen from above only its top half shows (the rising front face is
-        //     hidden under it), from the rim at a quarter turn to the top at a half turn. Each strip is cut to
-        //     where the page actually exists along it, and sheared so its ends follow the local radius.
-        const step = 1.25
-        for (let u = step; u < arc; u += step) {
-            let v1, v2
-            if (R1 === 0) { if (RC < u / PI || RC > 2 * u / PI) continue; v1 = -L; v2 = L }
-            else {
-                const a = vC + (u / PI - RC) / R1, b = vC + (2 * u / PI - RC) / R1
-                v1 = Math.min(a, b); v2 = Math.max(a, b)
+        // 2b. the roll. Seen from above only its top half shows (the rising front face is hidden under it),
+        //     from the rim at a quarter turn to the top at a half turn. Its outline is traced along the fold,
+        //     cut to where the page exists, and filled once, so there are no seams.
+        const uSpan = v => {   // the u-interval where the page exists along the fold-parallel line at v
+            const A = { x: F.x + t.x * v, y: F.y + t.y * v }
+            let lo = -Infinity, hi = Infinity
+            const cut = (a, dir, max) => {
+                if (Math.abs(dir) < 1e-6) { if (a < 0 || a > max) { lo = 1; hi = 0 } return }
+                const u1 = (0 - a) / dir, u2 = (max - a) / dir
+                lo = Math.max(lo, Math.min(u1, u2)); hi = Math.min(hi, Math.max(u1, u2))
             }
-            const [sa, sb] = this.#span(F, n, t, u - step / 2)
-            v1 = Math.max(v1, sa, -L); v2 = Math.min(v2, sb, L)
-            if (v2 - v1 < 0.5) continue
-            const at = v => { const R = Rv(v), th = Math.min(PI, u / R), x = R * Math.sin(th), w = step * Math.abs(Math.cos(th)); return { xl: x - w, w } }
-            const e1 = at(v1), e2 = at(v2)
-            const slope = (e2.xl - e1.xl) / Math.max(1, v2 - v1), x0 = e1.xl - slope * v1
-            const w = Math.max(0.8, (e1.w + e2.w) / 2) + 0.6
-            lctx.setTransform(dpr, 0, 0, dpr, 0, 0); fromFold(lctx); lctx.transform(1, 0, slope, 1, x0, 0)
-            lctx.fillRect(0, v1, w, v2 - v1)
+            cut(A.x, n.x, W); cut(A.y, n.y, H)
+            return [lo, hi]
+        }
+        const vs = [[0, 0], [W, 0], [0, H], [W, H]].map(([x, y]) => t.x * (x - F.x) + t.y * (y - F.y))
+        const vMin = Math.min(...vs), vMax = Math.max(...vs)
+        const rim = [], top = []
+        for (let v = vMin; v <= vMax + 2; v += 2) {
+            const R = Rv(v)
+            if (R < 0.5) continue
+            const [ua, ub] = uSpan(v)
+            const lo = Math.max(PI * R / 2, ua), hi = Math.min(PI * R, ub)
+            if (hi <= lo) continue
+            rim.push([R * Math.sin(lo / R), v])
+            top.push([R * Math.sin(hi / R) - (hi >= PI * R - 1e-6 ? 0.75 : 0), v])
+        }
+        if (rim.length > 1) {
+            lctx.setTransform(dpr, 0, 0, dpr, 0, 0); fromFold(lctx)
+            lctx.beginPath()
+            lctx.moveTo(rim[0][0], rim[0][1])
+            for (let i = 1; i < rim.length; i++) lctx.lineTo(rim[i][0], rim[i][1])
+            for (let i = top.length - 1; i >= 0; i--) lctx.lineTo(top[i][0], top[i][1])
+            lctx.closePath(); lctx.fill()
         }
         // 2c. light: the underside is a shade off the page it lies on; the roll is lit on top and falls into
         //     shadow at its rim
