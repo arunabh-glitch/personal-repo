@@ -7,15 +7,17 @@ import { translate, LANGS, defaultTarget } from './translate.js'
 import { Listener } from './listen.js'
 import { Companion } from './companion.js'
 import { LumiChat } from './chat.js'
+import { PageFlip } from './page-flip.js'
 
 const $ = s => document.querySelector(s)
 const $$ = s => Array.from(document.querySelectorAll(s))
 
 const DEFAULTS = {
     theme: 'light', fontSize: 18, lineHeight: 1.5, margin: 24, fontFamily: 'publisher', companion: true,
-    flow: 'paginated', justify: true, hyphenate: true, pdfZoom: 1, keepScreenOn: false, defineOnSelect: true,
+    flow: 'paginated', pageTurn: 'slide', justify: true, hyphenate: true, pdfZoom: 1, keepScreenOn: false, defineOnSelect: true,
     selectMode: false, translateTo: null,
 }
+const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches
 const PRESETS = {
     cosy: { theme: 'sepia', fontFamily: 'serif', fontSize: 19, lineHeight: 1.6, margin: 28, justify: true, flow: 'paginated' },
     focus: { theme: 'light', fontFamily: 'sans-serif', fontSize: 18, lineHeight: 1.5, margin: 32, justify: false, flow: 'paginated' },
@@ -220,6 +222,7 @@ class Reader {
         const view = document.createElement('foliate-view')
         $('#book').append(view)
         this.view = view
+        this.flip = new PageFlip($('#book'), view)
         await view.open(book)
         this.book = view.book
         this.kind = view.isFixedLayout ? 'fixed' : 'reflow'
@@ -271,7 +274,9 @@ class Reader {
             r.setAttribute('gap', '6%')
             r.setAttribute('max-inline-size', '760px')
             r.setAttribute('max-column-count', '2')
-            r.setAttribute('animated', '')
+            // book flip: pages swap instantly behind the animation and the host handles swipes itself
+            r.toggleAttribute('animated', !this.#flipOn)
+            r.toggleAttribute('no-swipe', this.#flipOn)
             r.setStyles?.(this.#bookCSS())
         } else {
             r.setAttribute('zoom', 'fit-page')
@@ -317,17 +322,19 @@ class Reader {
             this.#highlightRange({ cfi: this.view.getCFI(index, range) })
             this.define(range.toString())
         })
-        if (this.kind === 'fixed') {
-            let start = null
-            doc.addEventListener('touchstart', e => { const t = e.touches[0]; start = { x: t.screenX, y: t.screenY, t: Date.now() } }, { passive: true })
-            doc.addEventListener('touchend', e => {
-                if (!start) return
-                const t = e.changedTouches[0], dx = t.screenX - start.x, dy = t.screenY - start.y
-                if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - start.t < 600)
-                    dx < 0 ? this.view.goRight() : this.view.goLeft()
-                start = null
-            }, { passive: true })
-        }
+        // swipe to turn: always for fixed-layout pages; for reflowable pages only in book-flip mode, where
+        // the paginator's own finger-following slide is switched off
+        let start = null
+        doc.addEventListener('touchstart', e => { const t = e.touches[0]; start = e.touches.length === 1 ? { x: t.screenX, y: t.screenY, t: Date.now() } : null }, { passive: true })
+        doc.addEventListener('touchend', e => {
+            if (!start) return
+            const s = start; start = null
+            if (this.kind !== 'fixed' && !this.#flipOn) return
+            const sel = doc.getSelection?.(); if (sel && !sel.isCollapsed) return
+            const t = e.changedTouches[0], dx = t.screenX - s.x, dy = t.screenY - s.y
+            if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - s.t < 600)
+                dx < 0 ? this.goNext() : this.goPrev()
+        }, { passive: true })
     }
 
     #onDocClick(e, doc) {
@@ -467,8 +474,26 @@ class Reader {
     }
 
     // ---------- navigation ----------
-    goNext() { this.closeDictionary(); this.kind === 'pdf' ? this.pdf.next() : this.view.goRight() }
-    goPrev() { this.closeDictionary(); this.kind === 'pdf' ? this.pdf.prev() : this.view.goLeft() }
+    goNext() { return this.#turn(1) }
+    goPrev() { return this.#turn(-1) }
+
+    // the book-flip animation applies to paged books (reflowable in paginated flow, and fixed layout)
+    get #flipOn() {
+        return this.settings.pageTurn === 'curl' && !REDUCE_MOTION && this.kind !== 'pdf'
+            && (this.kind === 'fixed' || this.settings.flow === 'paginated')
+    }
+
+    // dir is the visual direction (+1 = right); in right-to-left books that reads backwards
+    #turn(dir) {
+        this.closeDictionary()
+        if (this.kind === 'pdf') return dir > 0 ? this.pdf.next() : this.pdf.prev()
+        const go = () => dir > 0 ? this.view.goRight() : this.view.goLeft()
+        if (!this.#flipOn || !this.flip) return go()
+        const rtl = this.book?.dir === 'rtl', forward = rtl ? dir < 0 : dir > 0
+        const r = this.view.renderer
+        if (forward ? r?.atEnd : r?.atStart) return go()
+        return this.flip.turn(forward ? 1 : -1, go, { rtl })
+    }
     goTo(href) { this.kind === 'pdf' ? this.pdf.goTo(href) : this.view.goTo(href).catch(console.error) }
     goToFraction(f) { this.kind === 'pdf' ? this.pdf.goToFraction(f) : this.view.goToFraction(f).catch(console.error) }
 
@@ -1073,6 +1098,7 @@ class Reader {
         // settings
         $$('#theme-chips [data-theme]').forEach(c => c.addEventListener('click', () => this.#update({ theme: c.dataset.theme })))
         $$('[data-flow]').forEach(c => c.addEventListener('click', () => this.#update({ flow: c.dataset.flow })))
+        $$('[data-turn]').forEach(c => c.addEventListener('click', () => this.#update({ pageTurn: c.dataset.turn })))
         $$('[data-step]').forEach(b => b.addEventListener('click', () => {
             const k = b.dataset.step, d = +b.dataset.delta
             const limits = { fontSize: [10, 40], lineHeight: [1, 2.6], margin: [0, 72], pdfZoom: [0.5, 5] }[k]
@@ -1158,6 +1184,8 @@ class Reader {
         const s = this.settings
         $$('#theme-chips [data-theme]').forEach(c => c.classList.toggle('active', c.dataset.theme === s.theme))
         $$('[data-flow]').forEach(c => c.classList.toggle('active', c.dataset.flow === s.flow))
+        $$('[data-turn]').forEach(c => c.classList.toggle('active', c.dataset.turn === (s.pageTurn || 'slide')))
+        $('#row-turn').classList.toggle('off', this.kind === 'reflow' && s.flow !== 'paginated')
         $('#chk-companion').checked = s.companion !== false
         $('#val-fontSize').textContent = s.fontSize
         $('#val-lineHeight').textContent = s.lineHeight.toFixed(1)
