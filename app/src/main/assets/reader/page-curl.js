@@ -106,65 +106,79 @@ export class PageCurl {
         if (D < 0.5) { ctx.drawImage(sheet, 0, 0, W, H); return }
         // n points across the fold toward the corner, t runs along the fold
         const n = { x: dx / D, y: dy / D }, t = { x: -n.y, y: n.x }
-        const R = Math.min(this.#rMax(), D / PI)
-        const arc = PI * R                      // paper wrapped around the cylinder
-        const uC = (D + arc) / 2                // the fold sits this far from the corner
+        const RC = Math.min(this.#rMax(), D / PI)   // radius of the roll at the corner
+        const arc = PI * RC                          // paper wrapped around the roll there
+        const uC = (D + arc) / 2                     // the fold sits this far from the corner
         const F = { x: C.x - n.x * uC, y: C.y - n.y * uC }
         const fromFold = c => c.transform(n.x, n.y, t.x, t.y, F.x, F.y)
         const toFold = c => c.transform(n.x, t.x, n.y, t.y, -(n.x * F.x + n.y * F.y), -(t.x * F.x + t.y * F.y))
         const far = 4 * L
+        // the roll is a cone: widest at the corner being held, tightening toward the far end of the fold
+        const vC = t.x * (C.x - F.x) + t.y * (C.y - F.y)
+        const [va, vb] = this.#span(F, n, t, 0)
+        let R1 = 0
+        if (vb > va) {
+            const vFar = Math.abs(va - vC) > Math.abs(vb - vC) ? va : vb
+            if (Math.abs(vFar - vC) > 1) R1 = (0.35 * RC - RC) / (vFar - vC)
+        }
+        const Rv = v => RC + R1 * (v - vC)
 
         // 1. the part of the sheet still flat on the page (u <= 0)
         ctx.save(); fromFold(ctx)
         ctx.beginPath(); ctx.rect(-far, -far, far, 2 * far); ctx.clip()
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.drawImage(sheet, 0, 0, W, H)
         ctx.restore()
-        if (R < 1.5) return
+        if (RC < 1.5) return
 
-        // 2. the band of paper on the cylinder, in fold coordinates (u in [0, arc]), shaded on both faces
+        // 2. the sheet in fold coordinates, u in [0, arc], to cut strips from
         const bh = 2 * L
         bctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-        bctx.globalCompositeOperation = 'source-over'
         bctx.clearRect(0, 0, arc + 4, bh)
         bctx.save(); bctx.translate(0, L); toFold(bctx); bctx.drawImage(sheet, 0, 0, W, H); bctx.restore()
-        bctx.globalCompositeOperation = 'source-atop'
-        // the front face dims gently into the bend; the back face is the paper's underside, brightest at the crest
-        let g = bctx.createLinearGradient(0, 0, arc / 2, 0)
-        g.addColorStop(0, 'rgba(0,0,0,0.11)'); g.addColorStop(0.6, 'rgba(0,0,0,0.02)'); g.addColorStop(1, 'rgba(0,0,0,0)')
-        bctx.fillStyle = g; bctx.fillRect(0, 0, arc / 2, bh)
-        bctx.fillStyle = rgba(this.paper, 0.86); bctx.fillRect(arc / 2, 0, arc / 2 + 2, bh)
-        g = bctx.createLinearGradient(arc / 2, 0, arc, 0)
-        g.addColorStop(0, 'rgba(255,255,255,0.08)'); g.addColorStop(0.4, 'rgba(0,0,0,0.02)'); g.addColorStop(1, 'rgba(0,0,0,0.13)')
-        bctx.fillStyle = g; bctx.fillRect(arc / 2, 0, arc / 2 + 2, bh)
 
-        // 3. the turned paper, on its own layer
+        // 3. the turned paper, on its own layer: everything on it is the underside of the page
         lctx.setTransform(dpr, 0, 0, dpr, 0, 0)
         lctx.globalCompositeOperation = 'source-over'
         lctx.clearRect(0, 0, W, H)
-        // 3a. flat again past the cylinder, face down: mirrored across the crest, landing at u' = arc - u <= 0
+        // 3a. flat again past the roll, face down: the sheet reflected across the roll's crest, which runs
+        //     at u = pi R(v), so the reflection carries a shear along the fold
         lctx.save(); fromFold(lctx)
         lctx.beginPath(); lctx.rect(-far, -far, far, 2 * far); lctx.clip()
-        lctx.transform(-1, 0, 0, 1, arc, 0); toFold(lctx); lctx.drawImage(sheet, 0, 0, W, H)
+        lctx.transform(-1, 0, PI * R1, 1, PI * (RC - R1 * vC), 0); toFold(lctx); lctx.drawImage(sheet, 0, 0, W, H)
         lctx.restore()
-        lctx.save(); lctx.globalCompositeOperation = 'source-atop'
+        // 3b. the roll, as thin strips. Seen from above only its top half shows (the rising front face is
+        //     hidden under it), from the rim at a quarter turn to the top at a half turn. With the cone each
+        //     strip is sheared so that its two ends land where the local radius puts them.
+        const step = 1.25
+        for (let u = step; u < arc; u += step) {
+            let v1, v2
+            if (R1 === 0) { if (RC < u / PI || RC > 2 * u / PI) continue; v1 = -L; v2 = L }
+            else {
+                const a = vC + (u / PI - RC) / R1, b = vC + (2 * u / PI - RC) / R1
+                v1 = Math.max(-L, Math.min(a, b)); v2 = Math.min(L, Math.max(a, b))
+                if (v2 - v1 < 0.5) continue
+            }
+            const at = v => { const R = Rv(v), th = Math.min(PI, u / R), x = R * Math.sin(th), w = step * Math.abs(Math.cos(th)); return { xl: x - w, w } }
+            const e1 = at(v1), e2 = at(v2)
+            const slope = (e2.xl - e1.xl) / Math.max(1, v2 - v1), x0 = e1.xl - slope * v1
+            const w = Math.max(0.8, (e1.w + e2.w) / 2) + 0.6
+            lctx.setTransform(dpr, 0, 0, dpr, 0, 0); fromFold(lctx); lctx.transform(1, 0, slope, 1, x0, 0)
+            lctx.drawImage(this.#band, (u - step) * dpr, (v1 + L) * dpr, step * dpr, (v2 - v1) * dpr, 0, v1, w, v2 - v1)
+        }
+        // 3c. paper: the print shows faintly through the underside; the roll is lit on top and falls into
+        //     shadow at its rim
+        lctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        lctx.globalCompositeOperation = 'source-atop'
         lctx.fillStyle = rgba(this.paper, 0.86); lctx.fillRect(0, 0, W, H)
         fromFold(lctx)
-        g = lctx.createLinearGradient(-2.2 * R, 0, 0, 0)
-        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.55, 'rgba(0,0,0,0.05)'); g.addColorStop(1, 'rgba(0,0,0,0.13)')
-        lctx.fillStyle = g; lctx.fillRect(-2.2 * R, -far, 2.2 * R, 2 * far)
-        lctx.restore()
-        // 3b. the cylinder, as thin strips: the back face comes over the top, the front face rises beneath it
-        lctx.save(); fromFold(lctx)
-        const step = 1.25
-        const strip = (u, w) => {
-            const th = u / R, up = R * Math.sin(th), c = Math.cos(th)
-            const wp = Math.max(0.8, w * Math.abs(c)) + 0.6
-            lctx.drawImage(this.#band, u * dpr, 0, w * dpr, bh * dpr, c >= 0 ? up : up - wp + 0.6, -L, wp, bh)
-        }
-        for (let u = arc - step; u >= arc / 2 - step; u -= step) strip(Math.max(0, u), step)
-        lctx.globalCompositeOperation = 'destination-over'
-        for (let u = 0; u < arc / 2; u += step) strip(u, step)
-        lctx.restore()
+        let g = lctx.createLinearGradient(0, 0, RC, 0)
+        g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.22, 'rgba(255,255,255,0.08)')
+        g.addColorStop(0.55, 'rgba(0,0,0,0.06)'); g.addColorStop(1, 'rgba(0,0,0,0.30)')
+        lctx.fillStyle = g; lctx.fillRect(0, -far, RC, 2 * far)
+        g = lctx.createLinearGradient(-0.6 * RC, 0, 0, 0)
+        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.035)')
+        lctx.fillStyle = g; lctx.fillRect(-0.6 * RC, -far, 0.6 * RC, 2 * far)
+        lctx.globalCompositeOperation = 'source-over'
 
         // 4. the shadow the paper casts: its own silhouette, blurred, so it follows the fold and the curve of the
         //    edge and falls on whatever lies beneath. Drawn at a third of the size; the image itself lands far out
@@ -174,7 +188,7 @@ export class PageCurl {
         sctx.clearRect(0, 0, sc.width, sc.height)
         sctx.save()
         sctx.shadowColor = 'rgba(0,0,0,0.42)'
-        sctx.shadowBlur = Math.max(4, Math.min(10, R / k))
+        sctx.shadowBlur = Math.max(4, Math.min(10, RC / k))
         sctx.shadowOffsetX = 4000 + 4 / k; sctx.shadowOffsetY = 4000 + 7 / k
         sctx.drawImage(this.#layer, -4000, -4000, W / k, H / k)
         sctx.restore()
@@ -182,6 +196,19 @@ export class PageCurl {
         ctx.drawImage(sc, 0, 0, W, H)
         // 5. the paper itself
         ctx.drawImage(this.#layer, 0, 0, W, H)
+    }
+
+    // The v-interval where the line u = d (in the fold frame) crosses the page rectangle.
+    #span(F, n, t, d) {
+        const A = { x: F.x + n.x * d, y: F.y + n.y * d }
+        let lo = -Infinity, hi = Infinity
+        const cut = (a, dir, max) => {
+            if (Math.abs(dir) < 1e-6) { if (a < 0 || a > max) { lo = 1; hi = 0 } return }
+            const v1 = (0 - a) / dir, v2 = (max - a) / dir
+            lo = Math.max(lo, Math.min(v1, v2)); hi = Math.min(hi, Math.max(v1, v2))
+        }
+        cut(A.x, t.x, this.#W); cut(A.y, t.y, this.#H)
+        return [lo, hi]
     }
 }
 
