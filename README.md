@@ -33,7 +33,7 @@ Runs as an Android app and as an installable web app for iPhone, iPad and deskto
 - Reading sessions are recorded automatically; finishing a book brings confetti.
 - Long-press (or double-tap) any word to see its meaning, pronunciation and examples without leaving the page. Looked-up words are cached, so they work offline afterwards. Works in EPUBs, PDFs and text files.
 - Pagination or continuous scroll, swipe or tap zones (left = back, right = forward, centre = menu).
-- Page turn: a plain slide, or a "book flip" where the page lifts from its edge and folds over the spine (Display → Page turn).
+- Page turn: a plain slide, or a "book flip" where the page curls like paper under your finger, the print showing faintly through its back; drag from anywhere, or tap and it sweeps across on its own (Display → Page turn).
 - Themes (light, sepia, dusk, dark), text size, line spacing, margins, font family, justification.
 - Table of contents, in-book search, progress slider, chapter/page indicator.
 - PDF: continuous scroll, pinch and double-tap zoom, outline, text search, night mode filter.

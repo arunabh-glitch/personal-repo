@@ -8,6 +8,8 @@ import { Listener } from './listen.js'
 import { Companion } from './companion.js'
 import { LumiChat } from './chat.js'
 import { PageFlip } from './page-flip.js'
+import { PageCurl, easeOut, easeInOut } from './page-curl.js'
+import { snapshotPage } from './page-snapshot.js'
 
 const $ = s => document.querySelector(s)
 const $$ = s => Array.from(document.querySelectorAll(s))
@@ -222,7 +224,8 @@ class Reader {
         const view = document.createElement('foliate-view')
         $('#book').append(view)
         this.view = view
-        this.flip = new PageFlip($('#book'), view)
+        this.flip = new PageFlip($('#book'), view)   // fixed-layout pages
+        this.curl = new PageCurl($('#book'))         // reflowable pages
         await view.open(book)
         this.book = view.book
         this.kind = view.isFixedLayout ? 'fixed' : 'reflow'
@@ -322,19 +325,136 @@ class Reader {
             this.#highlightRange({ cfi: this.view.getCFI(index, range) })
             this.define(range.toString())
         })
-        // swipe to turn: always for fixed-layout pages; for reflowable pages only in book-flip mode, where
-        // the paginator's own finger-following slide is switched off
-        let start = null
-        doc.addEventListener('touchstart', e => { const t = e.touches[0]; start = e.touches.length === 1 ? { x: t.screenX, y: t.screenY, t: Date.now() } : null }, { passive: true })
-        doc.addEventListener('touchend', e => {
-            if (!start) return
-            const s = start; start = null
-            if (this.kind !== 'fixed' && !this.#flipOn) return
-            const sel = doc.getSelection?.(); if (sel && !sel.isCollapsed) return
-            const t = e.changedTouches[0], dx = t.screenX - s.x, dy = t.screenY - s.y
-            if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - s.t < 600)
-                dx < 0 ? this.goNext() : this.goPrev()
+        if (this.kind === 'fixed') {
+            // swipe to turn fixed-layout pages
+            let start = null
+            doc.addEventListener('touchstart', e => { const t = e.touches[0]; start = e.touches.length === 1 ? { x: t.screenX, y: t.screenY, t: Date.now() } : null }, { passive: true })
+            doc.addEventListener('touchend', e => {
+                if (!start) return
+                const s = start; start = null
+                const sel = doc.getSelection?.(); if (sel && !sel.isCollapsed) return
+                const t = e.changedTouches[0], dx = t.screenX - s.x, dy = t.screenY - s.y
+                if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - s.t < 600)
+                    dx < 0 ? this.goNext() : this.goPrev()
+            }, { passive: true })
+        } else this.#installCurlDrag(doc)
+    }
+
+    // ---------- paper page curl (reflowable pages, Display → Page turn → Book flip) ----------
+    #curlBusy = false; #curlChain = Promise.resolve(); #curlPending = 0
+
+    get #curlOn() { return this.#flipOn && this.kind === 'reflow' && !!this.curl }
+
+    // Starts a turn: snapshots the page, moves the book underneath it, and returns the session (null at the
+    // ends of the book). startY picks the corner that travels, top or bottom.
+    #curlBegin(forward, startY) {
+        const view = this.view, r = view.renderer
+        if (forward ? r.atEnd : r.atStart) return null
+        const book = $('#book'), W = book.clientWidth, H = book.clientHeight
+        const rtl = this.book?.dir === 'rtl'
+        const free = rtl ? 0 : W, spine = rtl ? W : 0
+        const cy = startY != null && startY < H / 2 ? 0 : H
+        const paper = (THEMES[this.settings.theme] ?? THEMES.light).bg
+        const corner = { x: free, y: cy }, away = { x: 2 * spine - free, y: cy }
+        const page = snapshotPage(view, paper)
+        const curl = this.curl
+        this.#curlBusy = true
+        curl.begin({ sheet: forward ? page : null, under: forward ? null : page, paper, corner, spine, start: forward ? corner : away })
+        const doc = r.getContents()[0]?.doc
+        const go = dir => ((dir > 0) !== rtl ? view.goRight() : view.goLeft())   // dir > 0: forward in reading order
+        view.style.visibility = 'hidden'
+        const ready = Promise.resolve().then(() => go(forward ? 1 : -1)).catch(console.warn).then(() => {
+            if (!forward) curl.sheet = snapshotPage(view, paper)   // the previous page comes in from the far side
+            view.style.visibility = ''
+            curl.refresh()
+        })
+        const lift = (cy === 0 ? -1 : 1) * H * 0.22
+        return {
+            curl, ready, corner, away, forward, W, H,
+            docChanged: () => r.getContents()[0]?.doc !== doc,
+            // 0 = the sheet lies flat on the page, 1 = it is fully turned away
+            progress: () => { const P = curl.point; return P ? Math.min(1, Math.max(0, (P.x - corner.x) / (away.x - corner.x))) : 0 },
+            // auto: a whole sweep on its own (tap, key); otherwise the sheet settles from where the finger left it
+            finish: async (complete, auto = false) => {
+                await ready
+                const land = forward ? !complete : complete
+                const target = land ? corner : away
+                const dist = Math.abs(curl.point.x - target.x) / Math.abs(away.x - corner.x)
+                await curl.animateTo(target, auto ? { duration: 600, lift, ease: easeInOut } : { duration: 200 + 300 * dist, lift: lift * dist * 0.6, ease: easeOut })
+                if (!complete) await Promise.resolve().then(() => go(forward ? -1 : 1)).catch(console.warn)   // back under the flat sheet
+                curl.end()
+                this.#curlBusy = false
+            },
+        }
+    }
+
+    // Tap, key or button: the corner sweeps across on its own. Turns queue up a little so quick taps still skim.
+    #curlTurn(forward, fallback) {
+        if (this.#curlPending >= 3) return
+        this.#curlPending++
+        const job = async () => {
+            if (this.#curlBusy) return
+            const s = this.#curlBegin(forward, null)
+            if (!s) return fallback()
+            await s.finish(true, true)
+        }
+        const p = this.#curlChain.then(job, job)
+        this.#curlChain = p
+        p.finally(() => this.#curlPending--)
+        return p
+    }
+
+    // Finger on the page: a horizontal drag picks the page up and the corner follows the finger. The corner
+    // travels twice as far as the finger, so a drag across the screen turns one page.
+    #installCurlDrag(doc) {
+        let start = null, sess = null, last = null, vx = 0
+        const host = $('#book')
+        const toPage = t => {
+            const fr = doc.defaultView?.frameElement?.getBoundingClientRect(), hr = host.getBoundingClientRect()
+            return { x: t.clientX + (fr?.left ?? hr.left) - hr.left, y: t.clientY + (fr?.top ?? hr.top) - hr.top }
+        }
+        const point = p => {
+            const { corner, away, H, forward } = sess, from = forward ? corner : away
+            const x = from.x + 2 * (p.x - start.x), y = from.y + (p.y - start.y)
+            return { x: Math.min(Math.max(x, Math.min(corner.x, away.x)), Math.max(corner.x, away.x)), y: Math.min(Math.max(y, 0), H) }
+        }
+        const release = complete => { const s = sess; sess = null; start = null; last = null; s.finish(complete) }
+        doc.addEventListener('touchstart', e => {
+            if (sess || this.#curlBusy || !this.#curlOn || e.touches.length !== 1) { start = null; return }
+            start = { ...toPage(e.touches[0]), t: e.timeStamp }; last = null; vx = 0
         }, { passive: true })
+        doc.addEventListener('touchmove', e => {
+            if (!start && !sess) return
+            if (e.touches.length !== 1) { if (sess) release(false); else start = null; return }
+            const p = toPage(e.touches[0])
+            if (!sess) {
+                const dx = p.x - start.x, dy = p.y - start.y
+                if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.2) return
+                const sel = doc.getSelection?.()
+                if (this.settings.selectMode || (sel && !sel.isCollapsed) || this.#curlBusy) { start = null; return }
+                const rtl = this.book?.dir === 'rtl'
+                sess = this.#curlBegin(rtl ? dx > 0 : dx < 0, start.y)
+                if (!sess) { start = null; return }
+                start = { ...p, t: e.timeStamp }
+                // when the turn crosses into another chapter the page under the finger is replaced and its
+                // touches stop arriving, so the turn completes on its own
+                sess.ready.then(() => { if (sess && sess.docChanged()) release(true) })
+            }
+            e.preventDefault()
+            if (last) vx = 0.7 * vx + 0.3 * (p.x - last.x) / Math.max(1, e.timeStamp - last.t)
+            last = { ...p, t: e.timeStamp }
+            sess.curl.setPoint(point(p))
+        }, { passive: false })
+        doc.addEventListener('touchend', () => {
+            if (!sess) { start = null; return }
+            const { forward, corner, away } = sess
+            const dir = Math.sign(away.x - corner.x)   // the x direction the corner travels to turn away
+            const f = sess.progress(), fling = Math.abs(vx) > 0.35
+            // a flung sheet goes where it was flung; otherwise it settles on the nearer side
+            const complete = forward ? (fling ? Math.sign(vx) === dir : f > 0.5) : (fling ? Math.sign(vx) === -dir : f < 0.5)
+            release(complete)
+        }, { passive: true })
+        doc.addEventListener('touchcancel', () => { if (sess) release(false); start = null }, { passive: true })
     }
 
     #onDocClick(e, doc) {
@@ -490,6 +610,7 @@ class Reader {
         const go = () => dir > 0 ? this.view.goRight() : this.view.goLeft()
         if (!this.#flipOn || !this.flip) return go()
         const rtl = this.book?.dir === 'rtl', forward = rtl ? dir < 0 : dir > 0
+        if (this.kind === 'reflow') return this.#curlTurn(forward, go)
         const r = this.view.renderer
         if (forward ? r?.atEnd : r?.atStart) return go()
         return this.flip.turn(forward ? 1 : -1, go, { rtl })
