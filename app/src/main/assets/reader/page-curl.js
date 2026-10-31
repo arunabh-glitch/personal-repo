@@ -3,22 +3,19 @@
 // The page corner C is carried to a point P (the finger, or an animated path). The sheet folds along the
 // perpendicular bisector of C–P: up to the fold it lies flat; at the fold it bends around a cylinder of radius R
 // (so the edge of the page shows the curve of real paper); past the cylinder it lies flat again, face down, on
-// top of the page. Everything is drawn in the "fold frame" (u across the fold, v along it) onto a transparent
-// layer, so shading can be applied only where paper exists, and then composited over whatever lies beneath:
-// another snapshot, or the live page that the book has already moved to.
+// top of the page. The underside is plain paper. Everything is drawn in the "fold frame" (u across the fold,
+// v along it) onto a transparent layer, so light and shadow apply only where paper exists, and then composited
+// over whatever lies beneath: another snapshot, or the live page that the book has already moved to.
 import { MAX_DPR } from './page-snapshot.js'
 
 const PI = Math.PI
 const SHADOW_SCALE = 3   // the shadow is blurred at a third of the size, which is both softer and cheaper
+const MAX_TAPER = 0.035  // how fast the roll's radius may change along the fold (about 6 degrees of shear at the crest)
 const easeInOut = k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2
 const easeOut = k => 1 - Math.pow(1 - k, 3)
-const rgba = (hex, a) => {
-    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex || '')
-    return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : `rgba(255,255,255,${a})`
-}
 
 export class PageCurl {
-    #stage; #canvas; #ctx; #layer; #lctx; #band; #bctx; #shadow; #sctx; #blank
+    #stage; #canvas; #ctx; #layer; #lctx; #shadow; #sctx; #blank
     #W = 0; #H = 0; #L = 0; #dpr = 1
     #P = null; #raf = 0; #anim = 0; #dirty = false
     sheet = null; under = null; paper = '#ffffff'
@@ -29,7 +26,6 @@ export class PageCurl {
         this.#canvas = document.createElement('canvas'); this.#canvas.className = 'curl-canvas'
         this.#ctx = this.#canvas.getContext('2d')
         this.#layer = document.createElement('canvas'); this.#lctx = this.#layer.getContext('2d')
-        this.#band = document.createElement('canvas'); this.#bctx = this.#band.getContext('2d')
         this.#shadow = document.createElement('canvas'); this.#sctx = this.#shadow.getContext('2d')
     }
 
@@ -46,7 +42,6 @@ export class PageCurl {
         const { W, H, L, dpr } = { W: this.#W, H: this.#H, L: this.#L, dpr: this.#dpr }
         this.#size(this.#canvas, W, H)
         this.#size(this.#layer, W, H)
-        this.#size(this.#band, Math.ceil(PI * this.#rMax() + 4), 2 * L)
         this.#shadow.width = Math.ceil(W / SHADOW_SCALE); this.#shadow.height = Math.ceil(H / SHADOW_SCALE)
         this.#blank = document.createElement('canvas'); this.#size(this.#blank, W, H)
         const bc = this.#blank.getContext('2d'); bc.scale(dpr, dpr); bc.fillStyle = paper; bc.fillRect(0, 0, W, H)
@@ -95,7 +90,7 @@ export class PageCurl {
         const P = this.#P
         if (!P) return
         const { W, H, L, dpr } = { W: this.#W, H: this.#H, L: this.#L, dpr: this.#dpr }
-        const ctx = this.#ctx, lctx = this.#lctx, bctx = this.#bctx
+        const ctx = this.#ctx, lctx = this.#lctx
         const sheet = this.sheet ?? this.#blank
         const C = this.corner
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -113,13 +108,14 @@ export class PageCurl {
         const fromFold = c => c.transform(n.x, n.y, t.x, t.y, F.x, F.y)
         const toFold = c => c.transform(n.x, t.x, n.y, t.y, -(n.x * F.x + n.y * F.y), -(t.x * F.x + t.y * F.y))
         const far = 4 * L
-        // the roll is a cone: widest at the corner being held, tightening toward the far end of the fold
+        // the roll is a gentle cone: widest at the corner being held, tightening toward the far end of the
+        // fold. The taper is capped, so a short fold stays nearly cylindrical instead of shearing the paper.
         const vC = t.x * (C.x - F.x) + t.y * (C.y - F.y)
         const [va, vb] = this.#span(F, n, t, 0)
         let R1 = 0
         if (vb > va) {
             const vFar = Math.abs(va - vC) > Math.abs(vb - vC) ? va : vb
-            if (Math.abs(vFar - vC) > 1) R1 = (0.35 * RC - RC) / (vFar - vC)
+            if (Math.abs(vFar - vC) > 1) R1 = Math.max(-MAX_TAPER, Math.min(MAX_TAPER, (0.35 * RC - RC) / (vFar - vC)))
         }
         const Rv = v => RC + R1 * (v - vC)
 
@@ -130,57 +126,55 @@ export class PageCurl {
         ctx.restore()
         if (RC < 1.5) return
 
-        // 2. the sheet in fold coordinates, u in [0, arc], to cut strips from
-        const bh = 2 * L
-        bctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-        bctx.clearRect(0, 0, arc + 4, bh)
-        bctx.save(); bctx.translate(0, L); toFold(bctx); bctx.drawImage(sheet, 0, 0, W, H); bctx.restore()
-
-        // 3. the turned paper, on its own layer: everything on it is the underside of the page
+        // 2. the turned paper, on its own layer: the plain underside of the page
         lctx.setTransform(dpr, 0, 0, dpr, 0, 0)
         lctx.globalCompositeOperation = 'source-over'
         lctx.clearRect(0, 0, W, H)
-        // 3a. flat again past the roll, face down: the sheet reflected across the roll's crest, which runs
-        //     at u = pi R(v), so the reflection carries a shear along the fold
+        lctx.fillStyle = this.paper
+        // 2a. flat again past the roll, face down: the page reflected across the roll's crest, which runs at
+        //     u = pi R(v), so the reflection carries the cone's slight shear along the fold
         lctx.save(); fromFold(lctx)
         lctx.beginPath(); lctx.rect(-far, -far, far, 2 * far); lctx.clip()
-        lctx.transform(-1, 0, PI * R1, 1, PI * (RC - R1 * vC), 0); toFold(lctx); lctx.drawImage(sheet, 0, 0, W, H)
+        lctx.transform(-1, 0, PI * R1, 1, PI * (RC - R1 * vC), 0); toFold(lctx); lctx.fillRect(0, 0, W, H)
         lctx.restore()
-        // 3b. the roll, as thin strips. Seen from above only its top half shows (the rising front face is
-        //     hidden under it), from the rim at a quarter turn to the top at a half turn. With the cone each
-        //     strip is sheared so that its two ends land where the local radius puts them.
+        // 2b. the roll, as thin strips. Seen from above only its top half shows (the rising front face is
+        //     hidden under it), from the rim at a quarter turn to the top at a half turn. Each strip is cut to
+        //     where the page actually exists along it, and sheared so its ends follow the local radius.
         const step = 1.25
         for (let u = step; u < arc; u += step) {
             let v1, v2
             if (R1 === 0) { if (RC < u / PI || RC > 2 * u / PI) continue; v1 = -L; v2 = L }
             else {
                 const a = vC + (u / PI - RC) / R1, b = vC + (2 * u / PI - RC) / R1
-                v1 = Math.max(-L, Math.min(a, b)); v2 = Math.min(L, Math.max(a, b))
-                if (v2 - v1 < 0.5) continue
+                v1 = Math.min(a, b); v2 = Math.max(a, b)
             }
+            const [sa, sb] = this.#span(F, n, t, u - step / 2)
+            v1 = Math.max(v1, sa, -L); v2 = Math.min(v2, sb, L)
+            if (v2 - v1 < 0.5) continue
             const at = v => { const R = Rv(v), th = Math.min(PI, u / R), x = R * Math.sin(th), w = step * Math.abs(Math.cos(th)); return { xl: x - w, w } }
             const e1 = at(v1), e2 = at(v2)
             const slope = (e2.xl - e1.xl) / Math.max(1, v2 - v1), x0 = e1.xl - slope * v1
             const w = Math.max(0.8, (e1.w + e2.w) / 2) + 0.6
             lctx.setTransform(dpr, 0, 0, dpr, 0, 0); fromFold(lctx); lctx.transform(1, 0, slope, 1, x0, 0)
-            lctx.drawImage(this.#band, (u - step) * dpr, (v1 + L) * dpr, step * dpr, (v2 - v1) * dpr, 0, v1, w, v2 - v1)
+            lctx.fillRect(0, v1, w, v2 - v1)
         }
-        // 3c. paper: the print shows faintly through the underside; the roll is lit on top and falls into
+        // 2c. light: the underside is a shade off the page it lies on; the roll is lit on top and falls into
         //     shadow at its rim
         lctx.setTransform(dpr, 0, 0, dpr, 0, 0)
         lctx.globalCompositeOperation = 'source-atop'
-        lctx.fillStyle = rgba(this.paper, 0.86); lctx.fillRect(0, 0, W, H)
+        lctx.fillStyle = this.#dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'
+        lctx.fillRect(0, 0, W, H)
         fromFold(lctx)
         let g = lctx.createLinearGradient(0, 0, RC, 0)
-        g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.22, 'rgba(255,255,255,0.08)')
+        g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.22, 'rgba(255,255,255,0.10)')
         g.addColorStop(0.55, 'rgba(0,0,0,0.06)'); g.addColorStop(1, 'rgba(0,0,0,0.30)')
         lctx.fillStyle = g; lctx.fillRect(0, -far, RC, 2 * far)
         g = lctx.createLinearGradient(-0.6 * RC, 0, 0, 0)
-        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.035)')
+        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.04)')
         lctx.fillStyle = g; lctx.fillRect(-0.6 * RC, -far, 0.6 * RC, 2 * far)
         lctx.globalCompositeOperation = 'source-over'
 
-        // 4. the shadow the paper casts: its own silhouette, blurred, so it follows the fold and the curve of the
+        // 3. the shadow the paper casts: its own silhouette, blurred, so it follows the fold and the curve of the
         //    edge and falls on whatever lies beneath. Drawn at a third of the size; the image itself lands far out
         //    of view and only its shadow shows.
         const sc = this.#shadow, sctx = this.#sctx, k = SHADOW_SCALE
@@ -194,8 +188,13 @@ export class PageCurl {
         sctx.restore()
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
         ctx.drawImage(sc, 0, 0, W, H)
-        // 5. the paper itself
+        // 4. the paper itself
         ctx.drawImage(this.#layer, 0, 0, W, H)
+    }
+
+    get #dark() {
+        const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(this.paper || '')
+        return m ? (parseInt(m[1], 16) * 299 + parseInt(m[2], 16) * 587 + parseInt(m[3], 16) * 114) / 255000 < 0.5 : false
     }
 
     // The v-interval where the line u = d (in the fold frame) crosses the page rectangle.
