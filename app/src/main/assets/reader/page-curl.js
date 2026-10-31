@@ -9,6 +9,7 @@
 import { MAX_DPR } from './page-snapshot.js'
 
 const PI = Math.PI
+const SHADOW_SCALE = 3   // the shadow is blurred at a third of the size, which is both softer and cheaper
 const easeInOut = k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2
 const easeOut = k => 1 - Math.pow(1 - k, 3)
 const rgba = (hex, a) => {
@@ -17,7 +18,7 @@ const rgba = (hex, a) => {
 }
 
 export class PageCurl {
-    #stage; #canvas; #ctx; #layer; #lctx; #band; #bctx; #blank
+    #stage; #canvas; #ctx; #layer; #lctx; #band; #bctx; #shadow; #sctx; #blank
     #W = 0; #H = 0; #L = 0; #dpr = 1
     #P = null; #raf = 0; #anim = 0; #dirty = false
     sheet = null; under = null; paper = '#ffffff'
@@ -29,6 +30,7 @@ export class PageCurl {
         this.#ctx = this.#canvas.getContext('2d')
         this.#layer = document.createElement('canvas'); this.#lctx = this.#layer.getContext('2d')
         this.#band = document.createElement('canvas'); this.#bctx = this.#band.getContext('2d')
+        this.#shadow = document.createElement('canvas'); this.#sctx = this.#shadow.getContext('2d')
     }
 
     get point() { return this.#P }
@@ -45,6 +47,7 @@ export class PageCurl {
         this.#size(this.#canvas, W, H)
         this.#size(this.#layer, W, H)
         this.#size(this.#band, Math.ceil(PI * this.#rMax() + 4), 2 * L)
+        this.#shadow.width = Math.ceil(W / SHADOW_SCALE); this.#shadow.height = Math.ceil(H / SHADOW_SCALE)
         this.#blank = document.createElement('canvas'); this.#size(this.#blank, W, H)
         const bc = this.#blank.getContext('2d'); bc.scale(dpr, dpr); bc.fillStyle = paper; bc.fillRect(0, 0, W, H)
         Object.assign(this, { sheet, under, paper, corner, spine })
@@ -125,12 +128,13 @@ export class PageCurl {
         bctx.clearRect(0, 0, arc + 4, bh)
         bctx.save(); bctx.translate(0, L); toFold(bctx); bctx.drawImage(sheet, 0, 0, W, H); bctx.restore()
         bctx.globalCompositeOperation = 'source-atop'
+        // the front face dims gently into the bend; the back face is the paper's underside, brightest at the crest
         let g = bctx.createLinearGradient(0, 0, arc / 2, 0)
-        g.addColorStop(0, 'rgba(0,0,0,0.14)'); g.addColorStop(1, 'rgba(0,0,0,0)')
+        g.addColorStop(0, 'rgba(0,0,0,0.11)'); g.addColorStop(0.6, 'rgba(0,0,0,0.02)'); g.addColorStop(1, 'rgba(0,0,0,0)')
         bctx.fillStyle = g; bctx.fillRect(0, 0, arc / 2, bh)
         bctx.fillStyle = rgba(this.paper, 0.86); bctx.fillRect(arc / 2, 0, arc / 2 + 2, bh)
         g = bctx.createLinearGradient(arc / 2, 0, arc, 0)
-        g.addColorStop(0, 'rgba(255,255,255,0.10)'); g.addColorStop(0.45, 'rgba(0,0,0,0.04)'); g.addColorStop(1, 'rgba(0,0,0,0.26)')
+        g.addColorStop(0, 'rgba(255,255,255,0.08)'); g.addColorStop(0.4, 'rgba(0,0,0,0.02)'); g.addColorStop(1, 'rgba(0,0,0,0.13)')
         bctx.fillStyle = g; bctx.fillRect(arc / 2, 0, arc / 2 + 2, bh)
 
         // 3. the turned paper, on its own layer
@@ -145,9 +149,9 @@ export class PageCurl {
         lctx.save(); lctx.globalCompositeOperation = 'source-atop'
         lctx.fillStyle = rgba(this.paper, 0.86); lctx.fillRect(0, 0, W, H)
         fromFold(lctx)
-        g = lctx.createLinearGradient(-1.3 * R, 0, 0, 0)
-        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.24)')
-        lctx.fillStyle = g; lctx.fillRect(-1.3 * R, -far, 1.3 * R, 2 * far)
+        g = lctx.createLinearGradient(-2.2 * R, 0, 0, 0)
+        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.55, 'rgba(0,0,0,0.05)'); g.addColorStop(1, 'rgba(0,0,0,0.13)')
+        lctx.fillStyle = g; lctx.fillRect(-2.2 * R, -far, 2.2 * R, 2 * far)
         lctx.restore()
         // 3b. the cylinder, as thin strips: the back face comes over the top, the front face rises beneath it
         lctx.save(); fromFold(lctx)
@@ -162,31 +166,22 @@ export class PageCurl {
         for (let u = 0; u < arc / 2; u += step) strip(u, step)
         lctx.restore()
 
-        // 4. the shadow the lifted paper casts on what lies beneath, only along the part of the crest on the page
-        const [v0, v1] = this.#crestSpan(F, n, t, arc / 2)
-        if (v1 > v0) {
-            ctx.save(); fromFold(ctx)
-            g = ctx.createLinearGradient(R, 0, 2.2 * R, 0)
-            g.addColorStop(0, 'rgba(0,0,0,0.30)'); g.addColorStop(0.5, 'rgba(0,0,0,0.10)'); g.addColorStop(1, 'rgba(0,0,0,0)')
-            ctx.fillStyle = g; ctx.fillRect(R - 0.5, v0 - R, 1.2 * R + 0.5, v1 - v0 + 2 * R)
-            ctx.restore()
-        }
-        // 5. the paper itself
+        // 4. the shadow the paper casts: its own silhouette, blurred, so it follows the fold and the curve of the
+        //    edge and falls on whatever lies beneath. Drawn at a third of the size; the image itself lands far out
+        //    of view and only its shadow shows.
+        const sc = this.#shadow, sctx = this.#sctx, k = SHADOW_SCALE
+        sctx.setTransform(1, 0, 0, 1, 0, 0)
+        sctx.clearRect(0, 0, sc.width, sc.height)
+        sctx.save()
+        sctx.shadowColor = 'rgba(0,0,0,0.42)'
+        sctx.shadowBlur = Math.max(4, Math.min(10, R / k))
+        sctx.shadowOffsetX = 4000 + 4 / k; sctx.shadowOffsetY = 4000 + 7 / k
+        sctx.drawImage(this.#layer, -4000, -4000, W / k, H / k)
+        sctx.restore()
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        ctx.drawImage(sc, 0, 0, W, H)
+        // 5. the paper itself
         ctx.drawImage(this.#layer, 0, 0, W, H)
-    }
-
-    // The v-interval where the line u = d (in the fold frame) crosses the page rectangle.
-    #crestSpan(F, n, t, d) {
-        const A = { x: F.x + n.x * d, y: F.y + n.y * d }
-        let lo = -Infinity, hi = Infinity
-        const cut = (a, dir, max) => {
-            if (Math.abs(dir) < 1e-6) { if (a < 0 || a > max) { lo = 1; hi = 0 } return }
-            const v1 = (0 - a) / dir, v2 = (max - a) / dir
-            lo = Math.max(lo, Math.min(v1, v2)); hi = Math.min(hi, Math.max(v1, v2))
-        }
-        cut(A.x, t.x, this.#W); cut(A.y, t.y, this.#H)
-        return [lo, hi]
     }
 }
 
