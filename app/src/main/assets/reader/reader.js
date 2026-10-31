@@ -226,6 +226,7 @@ class Reader {
         this.view = view
         this.flip = new PageFlip($('#book'), view)   // fixed-layout pages
         this.curl = new PageCurl($('#book'))         // reflowable pages
+        this.#installCurlDrag($('#book'), document)  // drags that start in the margins around the page
         await view.open(book)
         this.book = view.book
         this.kind = view.isFixedLayout ? 'fixed' : 'reflow'
@@ -405,8 +406,9 @@ class Reader {
     }
 
     // Finger on the page: a horizontal drag picks the page up and the corner follows the finger. The corner
-    // travels twice as far as the finger, so a drag across the screen turns one page.
-    #installCurlDrag(doc) {
+    // travels twice as far as the finger, so a drag across the screen turns one page. Installed on each
+    // chapter's document and, for the margins around it, on the page container itself.
+    #installCurlDrag(el, doc = el) {
         let start = null, sess = null, last = null, vx = 0
         const host = $('#book')
         const toPage = t => {
@@ -419,17 +421,17 @@ class Reader {
             return { x: Math.min(Math.max(x, Math.min(corner.x, away.x)), Math.max(corner.x, away.x)), y: Math.min(Math.max(y, 0), H) }
         }
         const release = complete => { const s = sess; sess = null; start = null; last = null; s.finish(complete) }
-        doc.addEventListener('touchstart', e => {
+        el.addEventListener('touchstart', e => {
             if (sess || this.#curlBusy || !this.#curlOn || e.touches.length !== 1) { start = null; return }
             start = { ...toPage(e.touches[0]), t: e.timeStamp }; last = null; vx = 0
         }, { passive: true })
-        doc.addEventListener('touchmove', e => {
+        el.addEventListener('touchmove', e => {
             if (!start && !sess) return
             if (e.touches.length !== 1) { if (sess) release(false); else start = null; return }
             const p = toPage(e.touches[0])
             if (!sess) {
                 const dx = p.x - start.x, dy = p.y - start.y
-                if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.2) return
+                if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 0.5) return   // a corner drag is often diagonal
                 const sel = doc.getSelection?.()
                 if (this.settings.selectMode || (sel && !sel.isCollapsed) || this.#curlBusy) { start = null; return }
                 const rtl = this.book?.dir === 'rtl'
@@ -438,14 +440,14 @@ class Reader {
                 start = { ...p, t: e.timeStamp }
                 // when the turn crosses into another chapter the page under the finger is replaced and its
                 // touches stop arriving, so the turn completes on its own
-                sess.ready.then(() => { if (sess && sess.docChanged()) release(true) })
+                if (el !== host) sess.ready.then(() => { if (sess && sess.docChanged()) release(true) })
             }
             e.preventDefault()
             if (last) vx = 0.7 * vx + 0.3 * (p.x - last.x) / Math.max(1, e.timeStamp - last.t)
             last = { ...p, t: e.timeStamp }
             sess.curl.setPoint(point(p))
         }, { passive: false })
-        doc.addEventListener('touchend', () => {
+        el.addEventListener('touchend', () => {
             if (!sess) { start = null; return }
             const { forward, corner, away } = sess
             const dir = Math.sign(away.x - corner.x)   // the x direction the corner travels to turn away
@@ -454,7 +456,7 @@ class Reader {
             const complete = forward ? (fling ? Math.sign(vx) === dir : f > 0.5) : (fling ? Math.sign(vx) === -dir : f < 0.5)
             release(complete)
         }, { passive: true })
-        doc.addEventListener('touchcancel', () => { if (sess) release(false); start = null }, { passive: true })
+        el.addEventListener('touchcancel', () => { if (sess) release(false); start = null }, { passive: true })
     }
 
     #onDocClick(e, doc) {
